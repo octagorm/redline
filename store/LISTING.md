@@ -24,13 +24,13 @@ Pair the site you are working on (say http://localhost:3000) with the site to co
 • New words are highlighted, and removed words are struck through right where they were.
 • Press V to switch views: all changes, only what was added, or only what was removed.
 • Press J and K to jump to the next and previous change.
-• "pages" lists every page of the site that differs, including new and removed pages.
-• Review as you go: approve (A) or reject (X) each change, add notes or suggested wording (C), and copy them all as a list for whoever makes the fixes.
-• The badge counts the changed blocks.
+• Review as you go: approve (A) or reject (X) each change, or add a note or suggested wording (C). The badge shows how many changes are still to review.
+• "Copy notes" puts all your rejections, notes and suggested wording on the clipboard as one clear list, ready to paste to a colleague or an AI assistant.
+• "Pages" (P) lists every page of the site that differs, including new and removed pages, with each page's review progress. It checks pages on request, a batch at a time, so it is gentle on big sites.
 
 It stays on in the tab as you click around, including in single-page apps.
 
-Sites can set it up for their visitors: a preview build with <meta name="redline" content="https://your-production-site"> needs no settings at all, just a click on the button.
+Sites can set it up for their visitors: a preview build with <meta name="redline" content="https://your-production-site"> needs no settings at all, just a click on the button. That works for Vercel, Netlify and Cloudflare previews, and for GitHub Pages PR previews served from a folder.
 
 Redline compares the text both servers send, so a clock or a "3 minutes ago" drawn in the browser never shows up as a change. Sites behind a login work as long as you are signed in to them. Each pair can ignore parts of the page (menus, footers, footnote numbers) with a CSS selector.
 
@@ -42,11 +42,13 @@ Redline has no servers, analytics or accounts. It only talks to the sites you pa
 
 **Graphic assets:**
 - Store icon: `../icons/128.png`
-- Screenshots (1280×800): `screenshot-1-all.png`, `screenshot-2-added.png`, `screenshot-3-removed.png`
+- Screenshots (1280×800), in this order: `screenshot-1-all.png`,
+  `screenshot-2-review.png`, `screenshot-3-pages.png`, `screenshot-4-removed.png`
 - Small promo tile (440×280): `promo-440x280.png`
 
-To remake the screenshots: `STORE=1 npm test` (writes `all.png`, `added.png` and
-`removed.png` here; rename them), and open `tile.html` at 440×280 for the tile.
+To remake the screenshots: `STORE=1 npm test` (writes `all.png`, `review.png`,
+`pages.png` and `removed.png` here; rename them), and open `tile.html` at
+440×280 for the tile.
 
 **Homepage URL:** https://github.com/octagorm/redline
 
@@ -60,9 +62,9 @@ Compare the page in the current tab with the same page on another site the user 
 **Permission justifications:**
 
 - `storage`: Saves the user's pairs of sites to compare, their ignore rules, and their reviews of changes (approved, rejected, notes), in the browser only.
-- `scripting`: Runs the comparison script on the sites the user has added, and in a tab that was open before a site was added.
+- `scripting`: Runs the comparison script on the sites the user has added, in a tab that was open before a site was added, and reads a page's <meta name="redline"> tag when the user clicks the toolbar button.
 - `activeTab`: Lets the toolbar button turn the comparison on in the current tab.
-- Host permissions (optional, requested per site): Redline needs to read the pages of the site the user is working on and fetch the same pages from the site they compare it with. It asks for access to exactly the sites the user enters in its settings, at the moment they save them.
+- Host permissions (optional, requested per site): Redline needs to read the pages of the site the user is working on and fetch the same pages from the site they compare it with. It asks for access to exactly the two sites of a pair, when the user saves the pair or accepts the pair a page suggests.
 
 **Remote code:** No, I am not using remote code. (All code is in the package. Fetched pages are parsed as inert HTML; their scripts never run.)
 
