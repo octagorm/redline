@@ -402,6 +402,7 @@ C       add a note or wording">J K B A X C</span>
   form { margin-top:6px; width:min(340px, 80vw); padding:8px; border-radius:7px;
          background:#1c1a17; color:#f3efe6; box-shadow:0 2px 8px rgba(0,0,0,.3);
          font:12px/1.4 system-ui, sans-serif; display:grid; gap:6px; }
+  label { display:grid; gap:3px; opacity:.95; }
   textarea { font:12px/1.4 system-ui, sans-serif; background:#2a2722; color:#f3efe6;
              border:1px solid #4a453c; border-radius:5px; padding:5px; resize:vertical; }
   .row { display:flex; gap:8px; justify-content:flex-end; align-items:center; }
@@ -417,10 +418,12 @@ C       add a note or wording">J K B A X C</span>
   <button class="note" data-tip="Note or wording   C">✎</button>
 </div>
 <form hidden>
-  <textarea name="note" rows="2" placeholder="Note"></textarea>
-  <textarea name="suggestion" rows="3" placeholder="Suggested wording" hidden></textarea>
+  <label>Comment on this change
+  <textarea name="note" rows="2" placeholder="What is wrong, or what to keep in mind"></textarea></label>
+  <label class="sug" hidden>Your wording: edit the text as it should read
+  <textarea name="suggestion" rows="3"></textarea></label>
   <div class="row">
-    <button type="button" class="link suggest grow">suggest wording</button>
+    <button type="button" class="link suggest grow">suggest new wording</button>
     <button type="button" class="cancel">cancel</button>
     <button type="submit" class="save">save</button>
   </div>
@@ -435,7 +438,7 @@ C       add a note or wording">J K B A X C</span>
     };
     $(".suggest").onclick = () => {
       const sug = $("[name=suggestion]");
-      sug.hidden = false;
+      $(".sug").hidden = false;
       if (!sug.value) sug.value = tools.change.kind === "removed" ? tools.change.before : tools.change.after;
       $(".suggest").hidden = true;
       placeTools();
@@ -472,7 +475,7 @@ C       add a note or wording">J K B A X C</span>
     form.querySelector("[name=note]").value = e.note ?? "";
     const sug = form.querySelector("[name=suggestion]");
     sug.value = e.suggestion ?? "";
-    sug.hidden = !e.suggestion;
+    form.querySelector(".sug").hidden = !e.suggestion;
     form.querySelector(".suggest").hidden = !!e.suggestion;
     form.hidden = false;
     placeTools();
