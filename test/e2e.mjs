@@ -86,6 +86,30 @@ const preview = {
   ),
 };
 const previewServer = await serve(preview, 47313, false);
+// A huge site: a sitemap index naming 6,000 pages, two of which changed.
+function bigSite(port, changed) {
+  const server = http.createServer((req, res) => {
+    const url = new URL(req.url, "http://x");
+    const xml = (body) => {
+      res.writeHead(200, { "content-type": "application/xml" });
+      res.end(`<?xml version="1.0"?>${body}`);
+    };
+    if (url.pathname === "/sitemap.xml")
+      return xml(`<sitemapindex>${[0, 1, 2].map((k) => `<sitemap><loc>http://localhost:${port}/sitemap-${k}.xml</loc></sitemap>`).join("")}</sitemapindex>`);
+    const m = url.pathname.match(/^\/sitemap-(\d)\.xml$/);
+    if (m)
+      return xml(`<urlset>${Array.from({ length: 2000 }, (_, i) => `<url><loc>https://big.example/p/${m[1] * 2000 + i}</loc></url>`).join("")}</urlset>`);
+    const n = url.pathname.match(/^\/p\/(\d+)$/)?.[1];
+    // Slow enough to stop halfway through a batch.
+    setTimeout(() => {
+    res.writeHead(n ? 200 : 404, { "content-type": "text/html" });
+    res.end(n ? `<!doctype html><title>${n}</title><p>Page ${n} says ${changed && ["5", "3000"].includes(n) ? "something new" : "the same thing"}.</p>` : "not found");
+    }, 15);
+  });
+  return new Promise((ok) => server.listen(port, () => ok(server)));
+}
+const bigDev = await bigSite(47314, true);
+const bigRef = await bigSite(47315, false);
 const devServer = await serve(dev, 47311, false);
 const refServer = await serve(reference, 47312, true);
 const DEV = "http://localhost:47311";
@@ -245,6 +269,35 @@ try {
   await tab.screenshot({ path: path.join(out, "pages.png") });
   assert.deepEqual(listed, ["/ 3 changes", "/about 1 change", "/fresh new page", "/gone removed page"]);
 
+  // A huge site: checks a batch at a time, nearest first, and says how much
+  // it has checked.
+  await sw.evaluate(async () => {
+    const { pairs } = await chrome.storage.sync.get("pairs");
+    pairs.push({ from: "http://localhost:47314", to: "http://localhost:47315", ignore: "", blocks: "" });
+    await chrome.storage.sync.set({ pairs });
+  });
+  await tab.waitForTimeout(300);
+  await tab.goto("http://localhost:47314/p/5?redline");
+  console.log("big site page:", await waitBadge(/change/));
+  const shadow = (sel) => `document.querySelector("#redline-host").shadowRoot.querySelector(${JSON.stringify(sel)})`;
+  const started = Date.now();
+  await tab.evaluate(`${shadow(".pages")}.click()`);
+  await tab.waitForFunction(`${shadow(".pnote")}.textContent.startsWith("checked")`, null, { timeout: 30000 });
+  const note = await tab.evaluate(`${shadow(".pnote")}.textContent`);
+  console.log("big site:", await tab.evaluate(`${shadow(".ptitle")}.textContent`), "|", note, "|", await tab.evaluate(`${shadow(".more")}.textContent`), `| ${Date.now() - started} ms`);
+  assert.match(note, /^checked 100 of 6,000\+? pages, nearest this one first/);
+  assert.deepEqual(await pagesList(), ["/p/5 1 change"], "the current page is checked first");
+  await tab.evaluate(`${shadow(".more")}.click()`);
+  await tab.waitForFunction(`${shadow(".pnote")}.textContent.startsWith("checked 200")`, null, { timeout: 30000 });
+  // Stop halfway through a batch keeps what was compared.
+  await tab.evaluate(`${shadow(".more")}.click()`);
+  await tab.waitForTimeout(150);
+  await tab.evaluate(`${shadow(".stop")}.click()`);
+  await tab.waitForFunction(`${shadow(".pnote")}.textContent.startsWith("checked")`, null, { timeout: 30000 });
+  const stoppedAt = await tab.evaluate(`${shadow(".pnote")}.textContent`);
+  console.log("after stop:", stoppedAt);
+  assert.match(stoppedAt, /^checked (2\d\d) of/);
+
   // hide turns it off and puts the page back.
   await tab.goto(DEV + "/");
   await waitBadge(/change/);
@@ -298,6 +351,8 @@ try {
 } finally {
   await context.close();
   devServer.close();
+  bigDev.close();
+  bigRef.close();
   previewServer.close();
   refServer.close();
 }

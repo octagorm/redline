@@ -20,9 +20,15 @@ The badge in the corner counts the changed blocks and switches views too.
 number of changes, and pages that are new or were removed. Click one to open
 it with Redline on. It finds the pages from the site's `sitemap.xml` (and the
 other site's, to catch removed pages), or, without one, by following links
-from the page you are on. It fetches each page from both sites, so it runs
-only when you ask, and stops at 200 pages. The list stays for the tab until
-you scan again.
+from the page you are on.
+
+It is made to be gentle on big sites. It runs only when you ask, fetches
+three pages at a time, and checks 100 pages per click, starting with the ones
+nearest the page you are on; **check 100 more** carries on, and **stop**
+stops. It reads at most 5,000 addresses from the sitemaps (and 10 files of a
+sitemap index) and follows at most 200 links. It always says how many pages
+it has checked out of how many, so a partial list never passes for a full
+one. The list stays for the tab until you scan again.
 
 ![The pages list: which pages differ, and how much](docs/pages.png)
 

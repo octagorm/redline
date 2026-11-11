@@ -91,11 +91,17 @@
   .panel .removed { color:#ff8a80; }
   .panel .head { display:flex; justify-content:space-between; gap:12px; }
   .panel button { opacity:.8; }
+  .panel .pnote { opacity:.6; }
+  .panel .more { margin-top:6px; }
 </style>
 <div class="wrap">
 <div class="panel" hidden>
-  <div class="head"><span class="ptitle"></span><button class="rescan">scan again</button></div>
+  <div class="head"><span class="ptitle"></span><span>
+    <button class="stop" hidden>stop</button>
+    <button class="rescan" hidden>scan again</button></span></div>
+  <div class="pnote"></div>
   <ul></ul>
+  <button class="more" hidden></button>
 </div>
 <div class="b">
   <span class="msg"></span>
@@ -125,9 +131,14 @@
       ptitle: $(".ptitle"),
       plist: $(".panel ul"),
       rescan: $(".rescan"),
+      stop: $(".stop"),
+      more: $(".more"),
+      pnote: $(".pnote"),
     };
+    ui.stop.onclick = () => stopScan();
+    ui.more.onclick = () => scanPages(false);
     ui.pages.onclick = () => togglePages();
-    ui.rescan.onclick = () => scanPages();
+    ui.rescan.onclick = () => scanPages(true);
     ui.count.onclick = () => step(1, true);
     for (const b of root.querySelectorAll("[data-mode]"))
       b.onclick = () => setMode(b.dataset.mode);
@@ -284,18 +295,30 @@
 
   // ---------- the "pages" panel: which pages of the site differ ----------
 
-  // Results last for the tab, so the list survives moving between pages.
+  // The scan lasts for the tab, so the list survives moving between pages
+  // and "check more" carries on where it stopped.
   const PAGES_KEY = "redline-pages";
+  const BATCH = 100;
   const scanKey = () => pair && `${pair.from} -> ${pair.to}`;
-  let scanning = false;
+  let scan = null; // { key, rests, total, complete, next, items, at }
+  let crawled = new Map();
+  let signal = null; // { stopped } while a scan runs
 
-  function savedScan() {
+  function loadScan() {
+    if (scan?.key === scanKey()) return scan;
     try {
       const s = JSON.parse(sessionStorage.getItem(PAGES_KEY));
-      return s?.key === scanKey() ? s : null;
+      scan = s?.key === scanKey() ? s : null;
     } catch {
-      return null;
+      scan = null;
     }
+    return scan;
+  }
+
+  function saveScan() {
+    try {
+      sessionStorage.setItem(PAGES_KEY, JSON.stringify(scan));
+    } catch {}
   }
 
   function togglePages() {
@@ -305,47 +328,89 @@
       return;
     }
     u.panel.hidden = false;
-    const s = savedScan();
-    if (s) listPages(s.items, s.at);
-    else scanPages();
+    if (loadScan()) listPages();
+    else scanPages(true);
   }
 
-  async function scanPages() {
-    if (scanning || !pair) return;
+  function stopScan() {
+    if (signal) signal.stopped = true;
+  }
+
+  // From the start (`fresh`), or the next batch of the scan so far.
+  async function scanPages(fresh) {
+    if (signal || !pair) return;
     const opt = options();
     if (!opt) return;
-    scanning = true;
     const u = badge();
     u.panel.hidden = false;
-    u.plist.textContent = "";
-    u.rescan.hidden = true;
-    u.ptitle.textContent = "finding pages…";
+    const mine = (signal = { stopped: false });
+    const status = (text) => {
+      u.ptitle.textContent = text;
+    };
+    listPages(true);
     try {
-      const items = await globalThis.RedlineScan.scan(pair, opt, (done, total) => {
-        u.ptitle.textContent = total ? `comparing ${done} of ${total} pages…` : "finding pages…";
-      });
-      const at = Date.now();
-      try {
-        sessionStorage.setItem(PAGES_KEY, JSON.stringify({ key: scanKey(), at, items }));
-      } catch {}
-      listPages(items, at);
+      if (fresh || !loadScan()) {
+        const found = await globalThis.RedlineScan.discover(pair, mine, status);
+        crawled = found.crawled;
+        scan = {
+          key: scanKey(),
+          rests: found.rests,
+          total: found.total,
+          complete: found.complete,
+          next: 0,
+          items: [],
+          at: Date.now(),
+        };
+      }
+      const batch = scan.rests.slice(scan.next, scan.next + BATCH);
+      const { items, done } = await globalThis.RedlineScan.check(
+        pair,
+        opt,
+        batch,
+        crawled,
+        mine,
+        (done) => status(`comparing ${scan.next + done} of ${scan.rests.length}…`)
+      );
+      // A stopped batch keeps what it compared; the rest is checked next time.
+      scan.next += done;
+      scan.items = [...scan.items, ...items].sort((a, b) => a.path.localeCompare(b.path));
+      scan.at = Date.now();
+      saveScan();
     } catch (e) {
-      u.ptitle.textContent = `could not scan: ${e}`;
-    } finally {
-      scanning = false;
-      u.rescan.hidden = false;
+      status(`could not scan: ${e}`);
+      signal = null;
+      return;
     }
+    signal = null;
+    listPages();
   }
 
-  function listPages(items, at) {
+  function listPages(running = false) {
     const u = badge();
-    const mins = Math.round((Date.now() - at) / 60000);
+    u.stop.hidden = !running;
+    u.more.hidden = true;
+    u.rescan.hidden = running;
+    if (running || !scan) {
+      if (!scan) u.plist.textContent = "";
+      return;
+    }
+    const n = scan.items.length;
+    const checked = scan.next;
+    const all = checked >= scan.rests.length && scan.complete;
+    const mins = Math.round((Date.now() - scan.at) / 60000);
     const when = mins < 1 ? "just now" : `${mins} min ago`;
-    u.ptitle.textContent = items.length
-      ? `${items.length} ${items.length === 1 ? "page differs" : "pages differ"} (${when})`
-      : `no pages differ (${when})`;
+    const fmt = (x) => x.toLocaleString();
+    u.ptitle.textContent = `${n ? fmt(n) : "no"} ${n === 1 ? "page differs" : "pages differ"}`;
+    u.pnote.textContent = all
+      ? `checked all ${fmt(checked)} pages, ${when}`
+      : `checked ${fmt(checked)} of ${fmt(Math.max(scan.total, scan.rests.length))}${scan.complete ? "" : "+"} pages, nearest this one first, ${when}`;
+    const left = scan.rests.length - checked;
+    if (left > 0) {
+      u.more.hidden = false;
+      u.more.textContent = `check ${fmt(Math.min(BATCH, left))} more`;
+    }
     u.plist.textContent = "";
-    for (const it of items) {
+    for (const it of scan.items) {
       const li = document.createElement("li");
       if (new URL(it.url).pathname === location.pathname) li.className = "here";
       const a = document.createElement("a");
@@ -356,12 +421,12 @@
         // Not on this site any more: open the reference's copy.
         a.href = globalThis.RedlinePairs.normalise(pair.to) + it.path;
       }
-      const n = document.createElement("span");
-      n.className = "n";
-      if (it.state === "new") n.innerHTML = '<span class="new">new page</span>';
-      else if (it.state === "removed") n.innerHTML = '<span class="removed">removed page</span>';
-      else n.textContent = `${it.count} ${it.count === 1 ? "change" : "changes"}`;
-      li.append(a, n);
+      const tag = document.createElement("span");
+      tag.className = "n";
+      if (it.state === "new") tag.innerHTML = '<span class="new">new page</span>';
+      else if (it.state === "removed") tag.innerHTML = '<span class="removed">removed page</span>';
+      else tag.textContent = `${it.count} ${it.count === 1 ? "change" : "changes"}`;
+      li.append(a, tag);
       u.plist.append(li);
     }
   }
@@ -414,6 +479,7 @@
   }
 
   function turnOff() {
+    stopScan();
     state.on = false;
     runId++;
     remember(false);
