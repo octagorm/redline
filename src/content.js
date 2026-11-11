@@ -399,10 +399,11 @@ C       add a note or wording">J K B A X C</span>
   .t button.ok[aria-pressed=true] { background:#3c9a5f; }
   .t button.no[aria-pressed=true] { background:#d9534a; }
   .t button.note[aria-pressed=true] { background:#8a6d2f; }
-  form { margin-top:6px; width:min(340px, 80vw); padding:8px; border-radius:7px;
+  form { margin-top:6px; width:min(460px, calc(100vw - 32px)); padding:8px; border-radius:7px;
          background:#1c1a17; color:#f3efe6; box-shadow:0 2px 8px rgba(0,0,0,.3);
          font:12px/1.4 system-ui, sans-serif; display:grid; gap:6px; }
   label { display:grid; gap:3px; opacity:.95; }
+  textarea[name=suggestion] { max-height:40vh; }
   textarea { font:12px/1.4 system-ui, sans-serif; background:#2a2722; color:#f3efe6;
              border:1px solid #4a453c; border-radius:5px; padding:5px; resize:vertical; }
   .row { display:flex; gap:8px; justify-content:flex-end; align-items:center; }
@@ -441,8 +442,13 @@ C       add a note or wording">J K B A X C</span>
       $(".sug").hidden = false;
       if (!sug.value) sug.value = tools.change.kind === "removed" ? tools.change.before : tools.change.after;
       $(".suggest").hidden = true;
+      fit(sug);
       placeTools();
       sug.focus({ preventScroll: true });
+    };
+    $("[name=suggestion]").oninput = (e) => {
+      fit(e.target);
+      placeTools();
     };
     $("form").onsubmit = (e) => {
       e.preventDefault();
@@ -462,6 +468,12 @@ C       add a note or wording">J K B A X C</span>
     return root;
   }
 
+  // Tall enough for the whole paragraph, up to 40% of the window.
+  function fit(area) {
+    area.style.height = "auto";
+    area.style.height = `${area.scrollHeight + 2}px`;
+  }
+
   function toggleState(s) {
     const e = reviews?.entries[tools.change?.id];
     review(tools.change, { state: e?.state === s ? null : s });
@@ -478,6 +490,7 @@ C       add a note or wording">J K B A X C</span>
     form.querySelector(".sug").hidden = !e.suggestion;
     form.querySelector(".suggest").hidden = !!e.suggestion;
     form.hidden = false;
+    if (e.suggestion) fit(sug);
     placeTools();
     form.querySelector("[name=note]").focus({ preventScroll: true });
   }
