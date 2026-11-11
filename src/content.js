@@ -77,7 +77,11 @@
   .modes button[aria-pressed=true] { text-decoration:none; font-weight:700; }
   button { background:none; border:0; padding:0; color:inherit; font:inherit;
            text-decoration:underline; cursor:pointer; }
-  .keys { opacity:.7; cursor:help; }
+  .keys { cursor:help; display:inline-flex; gap:6px; align-items:center; }
+  .keys > span { opacity:.75; }
+  .keys .k-ok, .keys .k-no { opacity:1; color:#fff; padding:1px 5px; border-radius:4px; }
+  .keys .k-ok { background:#3c9a5f; }
+  .keys .k-no { background:#d9534a; box-shadow:0 0 0 1px rgba(255,255,255,.5); }
   .todo { font-weight:700; }
   .todo.done { font-weight:400; text-decoration:none; cursor:default; }
   /* Quick tooltips: the browser's own take a second to appear. */
@@ -124,7 +128,7 @@
 B       next view: all, added, removed
 A       approve the change
 X       reject it
-C       add a note or wording">J K B A X C</span>
+C       add a note or wording"><span>J↓</span><span>K↑</span><span>B</span><span class="k-ok">A ✓</span><span class="k-no">X ✗</span><span>C ✎</span></span>
   <span class="modes" hidden>
     <button data-mode="all" data-tip="New words highlighted, removed ones struck through (B)">all</button>
     <button data-mode="added" data-tip="Only what is new (B)">added</button>
