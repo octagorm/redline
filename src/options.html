@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Redline settings</title>
+<style>
+  :root { color-scheme: light dark; --line: #8884; --accent: #d9534a; }
+  body { font: 14px/1.5 system-ui, sans-serif; max-width: 760px; margin: 32px auto; padding: 0 16px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h1 span { color: var(--accent); }
+  p.lead { margin: 0 0 24px; opacity: .8; }
+  .pair { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; display: grid; grid-template-columns: 9em 1fr; gap: 8px 12px; align-items: center; }
+  .pair label { font-weight: 600; }
+  .pair input { font: 13px ui-monospace, Menlo, monospace; padding: 5px 7px; border: 1px solid var(--line); border-radius: 5px; background: transparent; color: inherit; width: 100%; box-sizing: border-box; }
+  .pair .hint { grid-column: 2; font-size: 12px; opacity: .7; margin-top: -4px; }
+  .pair .row-end { grid-column: 1 / -1; text-align: right; }
+  button { font: inherit; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: inherit; cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.link { border: 0; padding: 0; text-decoration: underline; opacity: .7; }
+  .actions { display: flex; gap: 8px; align-items: center; margin-top: 16px; }
+  #status { opacity: .8; }
+  details { margin-top: 32px; }
+  kbd { font: 12px ui-monospace, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+</style>
+</head>
+<body>
+<h1><span>Redline</span> settings</h1>
+<p class="lead">Each pair compares pages on one site with the same path on another. Turn it on in a tab with the toolbar button or <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>, or add <code>?redline</code> to the address.</p>
+
+<div id="pairs"></div>
+
+<div class="actions">
+  <button id="add">Add a pair</button>
+  <button id="save" class="primary">Save</button>
+  <span id="status"></span>
+</div>
+
+<details>
+  <summary>How it reads a page</summary>
+  <p>Redline fetches the reference page with your cookies for that site and reads both pages as text blocks: paragraphs, headings, list items, table cells and so on. Blocks the reference has the same are left alone. New words are highlighted; <kbd>B</kbd> shows the reference's wording instead, with removed words struck through; <kbd>J</kbd> and <kbd>K</kbd> go to the next and previous change.</p>
+  <p>It compares the two pages as their servers send them, before any script runs, and uses the live page only to find each block on screen. So text a script draws in the browser, like a clock or a relative date, never counts as a change. A page built entirely in the browser has no server text, so there Redline diffs the live page against the reference's server text instead.</p>
+  <p>Use "Ignore" for text that differs between the servers but is not content: footnote numbers that shift when a note is added, a build time, a version string.</p>
+</details>
+
+<template id="tpl">
+  <div class="pair">
+    <label>This site</label>
+    <input name="from" placeholder="http://localhost:3000" spellcheck="false">
+    <label>Compare with</label>
+    <input name="to" placeholder="https://example.com" spellcheck="false">
+    <label>Ignore</label>
+    <input name="ignore" placeholder="nav, footer, sup" spellcheck="false">
+    <div class="hint">CSS selector for text that is not content: menus, footers, footnote numbers (<code>sup</code>), build stamps.</div>
+    <label>Text blocks</label>
+    <input name="blocks" placeholder="default" spellcheck="false">
+    <div class="hint">Optional CSS selector for what counts as a block. Leave empty for the default.</div>
+    <div class="row-end"><button class="link remove">Remove</button></div>
+  </div>
+</template>
+
+<script src="options.js"></script>
+</body>
+</html>

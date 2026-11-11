@@ -1,0 +1,14 @@
+{
+  "name": "redline",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser extension: word-level diff of the page you are on against the same page on another site.",
+  "license": "MIT",
+  "scripts": {
+    "test": "node test/e2e.mjs",
+    "zip": "rm -f redline.zip && zip -qr redline.zip manifest.json src icons -x icons/icon.svg"
+  },
+  "devDependencies": {
+    "playwright": "^1.56.0"
+  }
+}

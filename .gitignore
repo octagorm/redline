@@ -1,0 +1,5 @@
+node_modules/
+redline.zip
+test/out/
+# The global "Icon?" rule (macOS folder icons) also catches this folder.
+!icons
