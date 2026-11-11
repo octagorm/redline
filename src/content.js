@@ -11,7 +11,8 @@
   const KEY = "redline";
   const MODES = ["all", "added", "removed"];
   const MODE_KEY = "redline-mode";
-  const state = { on: false, mode: savedMode(), count: null, current: null };
+  const state = { on: false, mode: savedMode(), count: null, current: null, changes: [] };
+  let reviews = null; // this pair's stored reviews (review.js)
 
   // The mode sticks for the tab, like being on does.
   function savedMode() {
@@ -106,13 +107,15 @@
 <div class="b">
   <span class="msg"></span>
   <button class="count" hidden></button>
-  <span class="keys" hidden title="J: next change. K: previous change. B: next mode (all, added, removed).">J K B</span>
+  <span class="reviewed" hidden title="Approved and rejected changes on this page"></span>
+  <span class="keys" hidden title="J / K: next or previous change. B: next view (all, added, removed). A: approve, X: reject, C: note, for the change with the toolbar.">J K B A X C</span>
   <span class="modes" hidden>
     <button data-mode="all" title="New words highlighted, removed words struck through">all</button>
     <button data-mode="added" title="Only what is new">added</button>
     <button data-mode="removed" title="The other site's wording, removed words struck through">removed</button>
   </span>
   <button class="pages" title="Which pages of the site differ">pages</button>
+  <button class="notes" hidden title="Copy your rejections, notes and suggested wording, for whoever makes the changes">copy notes</button>
   <button class="again" title="Compare again">again</button>
   <button class="off" title="Turn Redline off for this tab">hide</button>
 </div>
@@ -127,6 +130,8 @@
       again: $(".again"),
       off: $(".off"),
       pages: $(".pages"),
+      notes: $(".notes"),
+      reviewed: $(".reviewed"),
       panel: $(".panel"),
       ptitle: $(".ptitle"),
       plist: $(".panel ul"),
@@ -138,6 +143,7 @@
     ui.stop.onclick = () => stopScan();
     ui.more.onclick = () => scanPages(false);
     ui.pages.onclick = () => togglePages();
+    ui.notes.onclick = () => copyNotes();
     ui.rescan.onclick = () => scanPages(true);
     ui.count.onclick = () => step(1, true);
     for (const b of root.querySelectorAll("[data-mode]"))
@@ -159,6 +165,12 @@
     u.keys.hidden = !has;
     u.modes.hidden = !has;
     if (has) u.count.textContent = `${n} ${n === 1 ? "change" : "changes"}`;
+    const sum = has && reviews ? RV().pageSummary(reviews, rest()) : null;
+    u.reviewed.hidden = !(sum && (sum.ok || sum.no));
+    if (sum) u.reviewed.textContent = [sum.ok && `${sum.ok} ✓`, sum.no && `${sum.no} ✗`].filter(Boolean).join(" ");
+    const fb = reviews ? RV().feedback(reviews).length : 0;
+    u.notes.hidden = !fb;
+    if (fb) u.notes.textContent = `copy notes (${fb})`;
     for (const b of u.modes.children)
       b.setAttribute("aria-pressed", String(b.dataset.mode === state.mode));
     u.box.classList.toggle("removed", state.mode === "removed");
@@ -215,6 +227,8 @@
     }
     state.count = null;
     state.current = null;
+    state.changes = [];
+    hideTools();
     setMode(state.mode);
     R.clear();
     addStyle();
@@ -274,7 +288,14 @@
     }
     R.clear();
     const dom = R.blocks(document, opt);
-    state.count = R.show(dom, old, own);
+    state.changes = R.show(dom, old, own);
+    state.count = state.changes.length;
+    try {
+      reviews = await RV().setPage(pair, rest(), state.changes);
+    } catch {
+      reviews = null;
+    }
+    applyReviews();
     render(
       state.count === 0 ? `same as ${new URL(base).host}${note}` : "",
       `Compared with ${url}${note}`
@@ -292,6 +313,202 @@
     }
     return opt;
   }
+
+  // ---------- review: approve, reject, notes ----------
+
+  const RV = () => globalThis.RedlineReview;
+  const rest = () => globalThis.RedlinePairs.restFor(pair, location.href);
+  const changeOf = (el) => {
+    const id = el?.closest?.("[data-redline-id]")?.getAttribute("data-redline-id");
+    return id ? state.changes.find((c) => c.id === id) : null;
+  };
+
+  // Shows each change's review on the page.
+  function applyReviews() {
+    for (const el of document.querySelectorAll("[data-redline-id]")) {
+      const e = reviews?.entries[el.getAttribute("data-redline-id")];
+      if (e?.state) el.setAttribute("data-redline-review", e.state);
+      else el.removeAttribute("data-redline-review");
+      el.toggleAttribute("data-redline-noted", !!(e?.note || e?.suggestion));
+    }
+    if (tools.change) showTools(tools.change);
+  }
+
+  async function review(change, patch) {
+    if (!change) return;
+    reviews = await RV().update(pair, rest(), change, patch);
+    applyReviews();
+    render(ui?.msg.textContent, ui?.box.title);
+  }
+
+  async function copyNotes() {
+    if (!reviews) return;
+    const text = RV().markdown(pair, reviews);
+    try {
+      await navigator.clipboard.writeText(text);
+      flash("copied");
+    } catch {
+      // No clipboard (an unfocused page, say): show it to copy by hand.
+      prompt("Your notes:", text);
+    }
+  }
+
+  function flash(text) {
+    const b = badge().notes;
+    const was = b.textContent;
+    b.textContent = text;
+    setTimeout(() => (b.textContent = was), 1200);
+  }
+
+  // The little toolbar beside a change: ✓ approve, ✗ reject, ✎ note. It
+  // follows the pointer, or the change J and K went to.
+  const tools = { host: null, root: null, change: null, el: null };
+
+  function toolsUi() {
+    if (tools.host?.isConnected) return tools.root;
+    tools.host = document.createElement("div");
+    tools.host.id = "redline-tools";
+    tools.host.style.cssText = "all:initial;position:fixed;z-index:2147483646;top:0;left:0;";
+    const root = (tools.root = tools.host.attachShadow({ mode: "open" }));
+    root.innerHTML = `
+<style>
+  .t { display:flex; gap:2px; padding:3px; border-radius:7px; background:#1c1a17;
+       box-shadow:0 2px 8px rgba(0,0,0,.3); font:13px/1 system-ui, sans-serif; }
+  .t button { border:0; background:none; color:#f3efe6; width:26px; height:24px;
+              border-radius:5px; cursor:pointer; font:inherit; }
+  .t button:hover { background:#3a362f; }
+  .t button.ok[aria-pressed=true] { background:#3c9a5f; }
+  .t button.no[aria-pressed=true] { background:#d9534a; }
+  .t button.note[aria-pressed=true] { background:#8a6d2f; }
+  form { margin-top:6px; width:min(340px, 80vw); padding:8px; border-radius:7px;
+         background:#1c1a17; color:#f3efe6; box-shadow:0 2px 8px rgba(0,0,0,.3);
+         font:12px/1.4 system-ui, sans-serif; display:grid; gap:6px; }
+  textarea { font:12px/1.4 system-ui, sans-serif; background:#2a2722; color:#f3efe6;
+             border:1px solid #4a453c; border-radius:5px; padding:5px; resize:vertical; }
+  .row { display:flex; gap:8px; justify-content:flex-end; align-items:center; }
+  .row .grow { flex:1; }
+  form button { font:inherit; color:#f3efe6; background:#3a362f; border:0; border-radius:5px; padding:4px 10px; cursor:pointer; }
+  form button.save { background:#d9534a; }
+  form .link { background:none; padding:0; text-decoration:underline; opacity:.8; }
+  [hidden] { display:none !important; }
+</style>
+<div class="t">
+  <button class="ok" title="Approve (A)">✓</button>
+  <button class="no" title="Reject (X)">✗</button>
+  <button class="note" title="Note or suggested wording (C)">✎</button>
+</div>
+<form hidden>
+  <textarea name="note" rows="2" placeholder="Note"></textarea>
+  <textarea name="suggestion" rows="3" placeholder="Suggested wording" hidden></textarea>
+  <div class="row">
+    <button type="button" class="link suggest grow">suggest wording</button>
+    <button type="button" class="cancel">cancel</button>
+    <button type="submit" class="save">save</button>
+  </div>
+</form>`;
+    const $ = (q) => root.querySelector(q);
+    $(".ok").onclick = () => toggleState("ok");
+    $(".no").onclick = () => toggleState("no");
+    $(".note").onclick = () => openNote();
+    $(".cancel").onclick = () => ($("form").hidden = true);
+    $(".suggest").onclick = () => {
+      const sug = $("[name=suggestion]");
+      sug.hidden = false;
+      if (!sug.value) sug.value = tools.change.kind === "removed" ? tools.change.before : tools.change.after;
+      sug.focus();
+      $(".suggest").hidden = true;
+    };
+    $("form").onsubmit = (e) => {
+      e.preventDefault();
+      const note = $("[name=note]").value.trim();
+      let suggestion = $("[name=suggestion]").value.trim();
+      // Unchanged wording is no suggestion.
+      const current = tools.change.kind === "removed" ? tools.change.before : tools.change.after;
+      if (suggestion.replace(/\s+/g, " ") === current) suggestion = "";
+      $("form").hidden = true;
+      review(tools.change, { note, suggestion });
+    };
+    $("form").onkeydown = (e) => {
+      if (e.key === "Escape") $("form").hidden = true;
+      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) $("form").requestSubmit();
+    };
+    document.documentElement.append(tools.host);
+    return root;
+  }
+
+  function toggleState(s) {
+    const e = reviews?.entries[tools.change?.id];
+    review(tools.change, { state: e?.state === s ? null : s });
+  }
+
+  function openNote() {
+    const root = toolsUi();
+    if (!tools.change) return;
+    const e = reviews?.entries[tools.change.id] ?? {};
+    const form = root.querySelector("form");
+    form.querySelector("[name=note]").value = e.note ?? "";
+    const sug = form.querySelector("[name=suggestion]");
+    sug.value = e.suggestion ?? "";
+    sug.hidden = !e.suggestion;
+    form.querySelector(".suggest").hidden = !!e.suggestion;
+    form.hidden = false;
+    form.querySelector("[name=note]").focus();
+  }
+
+  // The element a change is shown by in the current mode.
+  function shownEl(change) {
+    for (const el of document.querySelectorAll(`[data-redline-id="${change.id}"]`))
+      if (el.getClientRects().length) return el;
+    return null;
+  }
+
+  function showTools(change) {
+    const root = toolsUi();
+    const el = shownEl(change);
+    if (!el) {
+      tools.host.hidden = true;
+      return;
+    }
+    if (tools.change?.id !== change.id) root.querySelector("form").hidden = true;
+    tools.change = change;
+    tools.el = el;
+    tools.host.hidden = false;
+    const e = reviews?.entries[change.id];
+    root.querySelector(".ok").setAttribute("aria-pressed", String(e?.state === "ok"));
+    root.querySelector(".no").setAttribute("aria-pressed", String(e?.state === "no"));
+    root.querySelector(".note").setAttribute("aria-pressed", String(!!(e?.note || e?.suggestion)));
+    placeTools();
+  }
+
+  // Beside the change's top right corner, inside the window.
+  function placeTools() {
+    if (!tools.el || tools.host?.hidden) return;
+    const r = tools.el.getBoundingClientRect();
+    const w = 90;
+    const left = Math.min(r.right + 10, innerWidth - w - 8);
+    const top = Math.max(8, Math.min(r.top - 2, innerHeight - 40));
+    tools.host.style.left = `${Math.max(8, left)}px`;
+    tools.host.style.top = `${top}px`;
+  }
+
+  function hideTools() {
+    tools.host?.remove();
+    tools.host = null;
+    tools.change = null;
+    tools.el = null;
+  }
+
+  addEventListener(
+    "mouseover",
+    (e) => {
+      if (!state.on || !state.count) return;
+      const change = changeOf(e.target);
+      if (change && change.id !== tools.change?.id) showTools(change);
+    },
+    true
+  );
+  addEventListener("scroll", () => placeTools(), { passive: true, capture: true });
+  addEventListener("resize", () => placeTools());
 
   // ---------- the "pages" panel: which pages of the site differ ----------
 
@@ -425,7 +642,16 @@
       tag.className = "n";
       if (it.state === "new") tag.innerHTML = '<span class="new">new page</span>';
       else if (it.state === "removed") tag.innerHTML = '<span class="removed">removed page</span>';
-      else tag.textContent = `${it.count} ${it.count === 1 ? "change" : "changes"}`;
+      else {
+        tag.textContent = `${it.count} ${it.count === 1 ? "change" : "changes"}`;
+        // Review progress, for pages opened since their text last changed.
+        const sum = reviews && RV().pageSummary(reviews, it.path);
+        if (sum && sum.total === it.count && (sum.ok || sum.no))
+          tag.textContent =
+            sum.ok === sum.total
+              ? "all approved"
+              : `${it.count} · ${[sum.ok && `${sum.ok} ✓`, sum.no && `${sum.no} ✗`].filter(Boolean).join(" ")}`;
+      }
       li.append(a, tag);
       u.plist.append(li);
     }
@@ -467,6 +693,7 @@
       sessionStorage.setItem(MODE_KEY, mode);
     } catch {}
     state.current = null;
+    if (tools.change) requestAnimationFrame(() => tools.change && showTools(tools.change));
     const html = document.documentElement.classList;
     for (const m of MODES) html.toggle(m === "removed" ? "redline-removed-only" : `redline-${m}`, m === mode);
     if (ui) render(ui.msg.textContent, ui.box.title);
@@ -480,6 +707,7 @@
 
   function turnOff() {
     stopScan();
+    hideTools();
     state.on = false;
     runId++;
     remember(false);
@@ -524,6 +752,8 @@
     if (!target) return;
     state.current = target;
     target.scrollIntoView({ behavior: "smooth", block: "center" });
+    const change = changeOf(target);
+    if (change) showTools(change);
   }
 
   addEventListener(
@@ -537,6 +767,14 @@
       const key = e.key.toLowerCase();
       if (key === "b")
         setMode(MODES[(MODES.indexOf(state.mode) + 1) % MODES.length]);
+      else if ((key === "a" || key === "x") && tools.change) {
+        // Approve or reject, then on to the next change.
+        const s = key === "a" ? "ok" : "no";
+        const was = reviews?.entries[tools.change.id]?.state;
+        review(tools.change, { state: was === s ? null : s }).then(() => {
+          if (was !== s) step(1);
+        });
+      } else if (key === "c" && tools.change) openNote();
       else if (key === "j") step(1);
       else if (key === "k") step(-1);
       else return;

@@ -37,11 +37,17 @@ globalThis.RedlinePairs ??= (() => {
     return best;
   }
 
+  // A page's path below the pair's "this site", the same on both sides.
+  function restFor(pair, href) {
+    const root = new URL(pair.from).pathname.replace(/\/+$/, "");
+    const rest = new URL(href).pathname.slice(root.length) || "/";
+    return rest.startsWith("/") ? rest : "/" + rest;
+  }
+
   // The address of `href` on the pair's other site.
   function referenceFor(pair, href) {
     const page = new URL(href);
-    const root = new URL(pair.from).pathname.replace(/\/+$/, "");
-    const rest = page.pathname.slice(root.length) || "/";
+    const rest = restFor(pair, href);
     const to = pair.to.replace(/\/+$/, "");
     return to + (rest.startsWith("/") ? rest : "/" + rest) + page.search;
   }
@@ -86,5 +92,5 @@ globalThis.RedlinePairs ??= (() => {
     return { to: meta("redline"), root: meta("redline-root"), ignore: meta("redline-ignore") };
   }
 
-  return { pairFor, referenceFor, normalise, hintFrom, readMeta };
+  return { pairFor, referenceFor, restFor, normalise, hintFrom, readMeta };
 })();

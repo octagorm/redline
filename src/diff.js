@@ -247,7 +247,8 @@ globalThis.Redline ??= (() => {
   }
 
   // Marks up the live page (`dom`, from blocks(document)) against the
-  // reference's block texts (`old`). Returns how many blocks differ.
+  // reference's block texts (`old`). Returns the changes, each
+  // { id, kind: "new" | "changed" | "removed", before, after }.
   //
   // `own` is this page's text as its server sent it. When given, the diff is
   // between the two server versions, and the live page is used only to find
@@ -267,6 +268,14 @@ globalThis.Redline ??= (() => {
       for (let k = i; k < own.length; k++) if (at(k)) return at(k);
       return undefined;
     };
+    // Every change, with an id made from its text: a review of it holds for
+    // as long as the change stays the same.
+    const changes = [];
+    const note = (kind, before, after, ...els) => {
+      const id = changeId(kind, before, after);
+      for (const el of els) el.setAttribute("data-redline-id", id);
+      changes.push({ id, kind, before, after });
+    };
     const removed = (text, before) => {
       const next = anchorFrom(before);
       const like = next ?? dom[dom.length - 1];
@@ -278,11 +287,11 @@ globalThis.Redline ??= (() => {
       );
       if (next) next.el.before(el);
       else like.el.after(el);
+      note("removed", text, "", el);
     };
 
     const kept = lcs(own, old, (a, b) => a === b);
     kept.push([own.length, old.length]);
-    let count = 0;
     let i = 0;
     let j = 0;
     for (const [ki, kj] of kept) {
@@ -296,19 +305,18 @@ globalThis.Redline ??= (() => {
             match = o;
             break;
           }
-        const b = at(i);
         // A block with nowhere to show on the live page (a script replaced
         // it) cannot be marked, so it is not counted either.
-        if (b) count++;
+        const b = at(i);
         if (match < 0) {
-          b?.el.setAttribute("data-redline-new", "");
+          if (b) {
+            b.el.setAttribute("data-redline-new", "");
+            note("new", "", own[i], b.el);
+          }
           continue;
         }
         // Old blocks skipped on the way to the match were removed.
-        for (let o = nextOld; o < match; o++) {
-          removed(old[o], i);
-          count++;
-        }
+        for (let o = nextOld; o < match; o++) removed(old[o], i);
         nextOld = match + 1;
         if (!b) continue;
         const was = old[match].split(" ");
@@ -316,13 +324,13 @@ globalThis.Redline ??= (() => {
         const keptNew = new Set(same.map(([x]) => x));
         const keptOld = new Set(same.map(([, y]) => y));
         b.el.setAttribute("data-redline-changed", "");
-        b.el.after(
-          oldBlock(
-            b.el,
-            was.map((text, k) => ({ text, gone: !keptOld.has(k) })),
-            false
-          )
+        const copy = oldBlock(
+          b.el,
+          was.map((text, k) => ({ text, gone: !keptOld.has(k) })),
+          false
         );
+        b.el.after(copy);
+        note("changed", old[match], own[i], b.el, copy);
         const fresh = b.toks.filter((_, k) => !keptNew.has(k));
         // A changed word with no text of its own (an image) marks the block.
         if (fresh.some((t) => !t.pieces.length))
@@ -338,14 +346,21 @@ globalThis.Redline ??= (() => {
         }
         markUp(b.el, b.toks, fresh, gaps);
       }
-      for (let o = nextOld; o < kj; o++) {
-        removed(old[o], ki);
-        count++;
-      }
+      for (let o = nextOld; o < kj; o++) removed(old[o], ki);
       i = ki + 1;
       j = kj + 1;
     }
-    return count;
+    return changes;
+  }
+
+  // A short id for a change, from its kind and text (FNV-1a).
+  function changeId(kind, before, after) {
+    let h = 0x811c9dc5;
+    for (const ch of `${kind}\u0000${before}\u0000${after}`) {
+      h ^= ch.codePointAt(0);
+      h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return h.toString(36);
   }
 
   // How many blocks show() would mark, from the texts alone: for listing the
@@ -381,10 +396,12 @@ globalThis.Redline ??= (() => {
       .querySelectorAll("mark.redline-new")
       .forEach((m) => m.replaceWith(...m.childNodes));
     doc
-      .querySelectorAll("[data-redline-new],[data-redline-changed]")
+      .querySelectorAll("[data-redline-new],[data-redline-changed],[data-redline-id]")
       .forEach((e) => {
         e.removeAttribute("data-redline-new");
         e.removeAttribute("data-redline-changed");
+        e.removeAttribute("data-redline-id");
+        e.removeAttribute("data-redline-review");
       });
   }
 
@@ -429,6 +446,27 @@ html.redline-all .redline-old.redline-removed {
 html.redline-all .redline-old.redline-removed del { background: none !important; }
 html.redline-removed-only [data-redline-changed],
 html.redline-removed-only [data-redline-new] { display: none !important; }
+/* Reviewed: approved changes turn green and quiet, rejected ones get a red ring. */
+html.redline-on [data-redline-review="ok"] {
+  box-shadow: -10px 0 0 rgba(80, 170, 110, 0.12), -13px 0 0 #3c9a5f !important;
+}
+html.redline-on [data-redline-review="ok"][data-redline-new],
+html.redline-on .redline-old[data-redline-review="ok"] {
+  background: rgba(80, 170, 110, 0.1) !important;
+}
+html.redline-on [data-redline-review="ok"] mark.redline-new {
+  background: rgba(80, 170, 110, 0.25) !important;
+}
+html.redline-on [data-redline-review="no"] {
+  outline: 2px solid #d9534a !important;
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+html.redline-on [data-redline-noted]::after {
+  content: " ✎";
+  color: #c08a2e;
+  font-weight: 700;
+}
 html.redline-added .redline-old.redline-removed {
   display: block !important;
   height: 0 !important;

@@ -7,6 +7,9 @@ Redline collects no data and sends no data anywhere.
 - To compare, it fetches the same page from the two sites you paired, the way
   your browser would if you opened them, with your own cookies for those
   sites. Those requests go only to the sites you entered.
+- Your reviews (which changes you approved or rejected, your notes and
+  suggested wording) stay in this browser's extension storage. They leave it
+  only when you copy them yourself.
 - Your pairs of sites are kept in Chrome's extension storage, which Chrome
   syncs between your own browsers if you have sync on.
 - There are no analytics, no tracking, no accounts and no servers of its own.

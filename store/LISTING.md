@@ -25,6 +25,7 @@ Pair the site you are working on (say http://localhost:3000) with the site to co
 • Press B to switch views: all changes, only what was added, or only what was removed.
 • Press J and K to jump to the next and previous change.
 • "pages" lists every page of the site that differs, including new and removed pages.
+• Review as you go: approve (A) or reject (X) each change, add notes or suggested wording (C), and copy them all as a list for whoever makes the fixes.
 • The badge counts the changed blocks.
 
 It stays on in the tab as you click around, including in single-page apps.
@@ -58,7 +59,7 @@ Compare the page in the current tab with the same page on another site the user 
 
 **Permission justifications:**
 
-- `storage`: Saves the user's pairs of sites to compare, and their ignore rules.
+- `storage`: Saves the user's pairs of sites to compare, their ignore rules, and their reviews of changes (approved, rejected, notes), in the browser only.
 - `scripting`: Runs the comparison script on the sites the user has added, and in a tab that was open before a site was added.
 - `activeTab`: Lets the toolbar button turn the comparison on in the current tab.
 - Host permissions (optional, requested per site): Redline needs to read the pages of the site the user is working on and fetch the same pages from the site they compare it with. It asks for access to exactly the sites the user enters in its settings, at the moment they save them.

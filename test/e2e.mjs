@@ -246,6 +246,50 @@ try {
   console.log("404 page:", await waitBadge(/change/));
   assert.equal(await tab.$$eval("[data-redline-new]", (e) => e.length), 2);
 
+  // Review: approve, reject and note changes; they stay after a reload.
+  await tab.goto(DEV + "/");
+  await waitBadge(/change/);
+  const toolsRoot = `document.querySelector("#redline-tools").shadowRoot`;
+  await tab.hover("p[data-redline-changed]");
+  await tab.waitForFunction(`!!document.querySelector("#redline-tools")`);
+  await tab.evaluate(`${toolsRoot}.querySelector(".ok").click()`);
+  await tab.waitForFunction(`document.querySelector("p[data-redline-changed]").getAttribute("data-redline-review") === "ok"`);
+  await tab.hover("p[data-redline-new]");
+  await tab.keyboard.press("x");
+  await tab.waitForFunction(`document.querySelector("p[data-redline-new]").getAttribute("data-redline-review") === "no"`);
+  await tab.keyboard.press("c");
+  await tab.waitForTimeout(100);
+  await tab.keyboard.type("Too vague; name a maker.");
+  await tab.evaluate(`${toolsRoot}.querySelector(".suggest").click()`);
+  await tab.evaluate(`(() => { const t = ${toolsRoot}.querySelector("[name=suggestion]"); t.value = "A new paragraph about Jost Bürgi's astrolabes."; })()`);
+  await tab.evaluate(`${toolsRoot}.querySelector("form").requestSubmit()`);
+  await tab.waitForFunction(`document.querySelector("p[data-redline-new]").hasAttribute("data-redline-noted")`);
+  console.log("reviewed:", await badge());
+  assert.match(await badge(), /1 ✓ 1 ✗/);
+  assert.match(await badge(), /copy notes \(1\)/);
+  await tab.screenshot({ path: path.join(out, "review.png") });
+  const notes = await sw.evaluate(async () => {
+    const all = await chrome.storage.local.get(null);
+    return Object.keys(all).filter((k) => k.startsWith("review:"));
+  });
+  const md = await tab.evaluate(async () => {
+    const pairs = (await chrome.storage?.sync?.get?.("pairs"))?.pairs;
+    return null;
+  });
+  void md;
+  const markdown = await sw.evaluate(async (key) => {
+    const data = (await chrome.storage.local.get(key))[key];
+    return JSON.stringify(Object.values(data.entries).map((e) => [e.state, e.kind, e.note ?? "", e.suggestion ?? ""]));
+  }, notes.find((k) => k.includes("47311")));
+  console.log("stored reviews:", markdown);
+  assert.deepEqual(JSON.parse(markdown).sort(), [
+    ["no", "new", "Too vague; name a maker.", "A new paragraph about Jost Bürgi's astrolabes."],
+    ["ok", "changed", "", ""],
+  ].sort());
+  await tab.reload();
+  await waitBadge(/change/);
+  assert.equal(await tab.getAttribute("p[data-redline-changed]", "data-redline-review"), "ok", "reviews last");
+
   // "pages" lists which pages of the site differ, from the sitemap.
   const pagesList = async () => {
     for (let i = 0; i < 60; i++) {
@@ -267,7 +311,7 @@ try {
   const listed = await pagesList();
   console.log("pages:", listed);
   await tab.screenshot({ path: path.join(out, "pages.png") });
-  assert.deepEqual(listed, ["/ 3 changes", "/about 1 change", "/fresh new page", "/gone removed page"]);
+  assert.deepEqual(listed, ["/ 3 · 1 ✓ 1 ✗", "/about 1 change", "/fresh new page", "/gone removed page"]);
 
   // A huge site: checks a batch at a time, nearest first, and says how much
   // it has checked.

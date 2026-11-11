@@ -16,6 +16,27 @@ The badge in the corner counts the changed blocks and switches views too.
 
 ![The "removed" view: the other site's wording, removed words struck through](docs/removed.png)
 
+## Review
+
+Point at a change (or go to it with <kbd>J</kbd>/<kbd>K</kbd>) and a small
+toolbar appears beside it: **✓** approves it (<kbd>A</kbd>), **✗** rejects it
+(<kbd>X</kbd>), and **✎** (<kbd>C</kbd>) adds a note or suggested wording.
+<kbd>A</kbd> and <kbd>X</kbd> move on to the next change. Approved changes turn
+green, rejected ones get a red ring, and the badge counts both.
+
+**copy notes** puts every rejection, note and suggested wording on the
+clipboard as a Markdown list, page by page, quoting the text and what it was
+before: ready to paste to Claude, or into a pull request review.
+
+![Reviewing: an approved change in green, a rejected one with a note, and the toolbar](docs/review.png)
+
+Reviews are kept in this browser, per pair of sites. Each belongs to the exact
+text of its change, so when a change is edited again, its review lapses and it
+is up for review again. The pages list shows how far each page's review has
+got.
+
+## Pages
+
 **pages** in the badge lists every page of the site that differs, with its
 number of changes, and pages that are new or were removed. Click one to open
 it with Redline on. It finds the pages from the site's `sitemap.xml` (and the

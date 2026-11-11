@@ -10,7 +10,7 @@
 importScripts("pairs.js");
 
 const SCRIPT_ID = "redline";
-const FILES = ["src/pairs.js", "src/diff.js", "src/scan.js", "src/content.js"];
+const FILES = ["src/pairs.js", "src/diff.js", "src/scan.js", "src/review.js", "src/content.js"];
 
 // Match patterns cannot name a port, so this covers every port on the host;
 // the content script then checks the exact origin against the pairs.
