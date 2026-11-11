@@ -30,7 +30,7 @@ ${body}
   document.getElementById("about").onclick = (e) => {
     e.preventDefault();
     history.pushState({}, "", "/about");
-    document.querySelector("main").innerHTML = "<h1>About</h1><p>We make clocks that show the sky.</p><h2>Makers</h2>";
+    document.querySelector("main").innerHTML = "<h1>About</h1><p class='body'>We make clocks that show the sky.</p><h2>Makers</h2>";
   };
 </script>
 </body></html>`;
@@ -43,7 +43,9 @@ const reference = {
 <p>Unchanged text stays as it is<sup>1</sup>.</p>
 <ul><li>First item</li><li>Second item</li></ul>
 </main>`),
-  // A paragraph removed just before a heading must still look like one.
+  // A paragraph removed just before a heading must still look like one: a
+  // paragraph styled like this page's paragraphs (the reference's class may
+  // be scoped to its own build).
   "/about": page(`<main><h1>About</h1><p>We make clocks.</p><p class="lead">We also repair them.</p><h2>Makers</h2></main>`),
   "/gone": page(`<main><h1>Gone</h1><p>Only on the reference.</p></main>`),
 };
@@ -56,7 +58,7 @@ const dev = {
 <ul><li>First item</li><li>Second item</li></ul>
 </main>`),
   // What the client-side navigation below draws, as the server would send it.
-  "/about": page(`<main><h1>About</h1><p>We make clocks that show the sky.</p><h2>Makers</h2></main>`),
+  "/about": page(`<main><h1>About</h1><p class="body">We make clocks that show the sky.</p><h2>Makers</h2></main>`),
   "/fresh": page(`<main><h1>Fresh page</h1><p>Only on dev.</p></main>`),
   // Sitemaps often name the production address even on a preview.
   "/sitemap.xml": `<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${["/", "/about", "/fresh", "/gone"]
@@ -242,8 +244,8 @@ try {
     ["clocks that show the sky."]
   );
   assert.deepEqual(
-    await tab.$eval(".redline-removed", (e) => [e.tagName, e.classList.contains("lead"), e.textContent]),
-    ["P", true, "We also repair them."],
+    await tab.$eval(".redline-removed", (e) => [e.tagName, e.classList.contains("body"), e.classList.contains("lead"), e.textContent]),
+    ["P", true, false, "We also repair them."],
     "a removed paragraph is a paragraph, not the heading it sits beside"
   );
 

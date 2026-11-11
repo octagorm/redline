@@ -224,6 +224,18 @@ globalThis.Redline ??= (() => {
   // A removed block has no live counterpart: it is built from the reference's
   // own element (`ref`: { tag, className }), so a removed paragraph looks like
   // a paragraph even when it is placed next to a heading.
+  function sameKind(like, tag) {
+    const all = [...document.getElementsByTagName(tag)].filter(
+      (e) => !e.closest(OWN) && !e.closest("nav, footer, header")
+    );
+    let best = null;
+    for (const e of all) {
+      if (e === like || like.compareDocumentPosition(e) & Node.DOCUMENT_POSITION_PRECEDING) best = e;
+      else break;
+    }
+    return best ?? all.find((e) => !(e.compareDocumentPosition(like) & Node.DOCUMENT_POSITION_CONTAINED_BY)) ?? null;
+  }
+
   const IN_LIST = new Set(["LI", "DT", "DD", "TD", "TH", "CAPTION", "SUMMARY"]);
   function oldBlock(like, words, removed, ref) {
     let tag = like.tagName;
@@ -231,10 +243,14 @@ globalThis.Redline ??= (() => {
     let css = like.style.cssText;
     if (ref) {
       tag = ref.tag;
-      cls = ref.className;
-      css = "";
       // An item of a list or table only fits beside another of its kind.
       if (IN_LIST.has(tag) && tag !== like.tagName) tag = "P";
+      // Classes are taken from a live element of the same kind, nearest
+      // before: the reference's own classes may be scoped to its build
+      // (styled-jsx, CSS modules) and style nothing on this page.
+      const twin = sameKind(like, tag);
+      cls = twin ? twin.className : ref.className;
+      css = twin ? twin.style.cssText : "";
     }
     const el = document.createElement(tag);
     el.className = typeof cls === "string" ? cls : "";
