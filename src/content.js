@@ -701,7 +701,9 @@ C       add a note or wording">J K B A X C</span>
         const t = RV().tally(sum);
         if (sum && sum.total === it.count && t)
           tag.textContent =
-            sum.ok === sum.total && !sum.noted ? "all approved" : `${it.count} · ${t}`;
+            sum.ok === sum.total && !sum.noted
+              ? "all approved"
+              : `${it.count} ${it.count === 1 ? "change" : "changes"}: ${t}`;
       }
       li.append(a, tag);
       u.plist.append(li);

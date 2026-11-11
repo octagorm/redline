@@ -337,7 +337,7 @@ try {
   const listed = await pagesList();
   console.log("pages:", listed);
   await tab.screenshot({ path: path.join(out, "pages.png") });
-  assert.deepEqual(listed, ["/ 3 · 1 ✓ 1 ✗ 1 ✎", "/about 1 change", "/fresh new page", "/gone removed page"]);
+  assert.deepEqual(listed, ["/ 3 changes: 1 ✓ 1 ✗ 1 ✎", "/about 1 change", "/fresh new page", "/gone removed page"]);
 
   // A huge site: checks a batch at a time, nearest first, and says how much
   // it has checked.
