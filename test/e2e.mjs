@@ -72,6 +72,14 @@ function serve(pages, port, needCookie) {
   return new Promise((ok) => server.listen(port, () => ok(server)));
 }
 
+// A preview build that names its reference itself, so it needs no setup.
+const preview = {
+  "/": dev["/"].replace(
+    "<head>",
+    `<head><meta name="redline" content="http://127.0.0.1:47312"><meta name="redline-ignore" content="nav, footer, sup">`
+  ),
+};
+const previewServer = await serve(preview, 47313, false);
 const devServer = await serve(dev, 47311, false);
 const refServer = await serve(reference, 47312, true);
 const DEV = "http://localhost:47311";
@@ -218,6 +226,27 @@ try {
   await tab.reload();
   await tab.waitForTimeout(800);
   assert.equal(await badge(), null, "stays off after hide");
+
+  // A site with a <meta name="redline"> tag: pressing the button sets up the
+  // pair from the tag and starts.
+  await tab.goto("http://localhost:47313/");
+  await tab.waitForTimeout(500);
+  await sw.evaluate(async () => {
+    const [t] = await chrome.tabs.query({ url: "http://localhost:47313/*" });
+    await self.onAction(t);
+  });
+  console.log("from the meta tag:", await waitBadge(/change/));
+  const saved = await sw.evaluate(async () => (await chrome.storage.sync.get("pairs")).pairs);
+  assert.ok(
+    saved.some(
+      (p) => p.from === "http://localhost:47313" && p.to === "http://127.0.0.1:47312" && p.ignore === "nav, footer, sup"
+    ),
+    "the pair from the tag is saved"
+  );
+  assert.deepEqual(
+    await tab.$$eval("mark.redline-new", (m) => m.map((x) => x.textContent)),
+    ["whole", "redrawn"]
+  );
   console.log("\nall checks passed; screenshots in test/out/");
 } catch (e) {
   failed = true;
@@ -225,6 +254,7 @@ try {
 } finally {
   await context.close();
   devServer.close();
+  previewServer.close();
   refServer.close();
 }
 process.exit(failed ? 1 : 0);

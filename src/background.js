@@ -22,7 +22,14 @@ async function pairs() {
   return pairs;
 }
 
-async function sync() {
+// One at a time: a save fires both the caller's sync and onChanged's.
+let syncing = Promise.resolve();
+function sync() {
+  syncing = syncing.then(syncNow, syncNow);
+  return syncing;
+}
+
+async function syncNow() {
   const matches = [];
   for (const p of await pairs()) {
     let m;
@@ -76,7 +83,10 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (msg.type === "options") chrome.runtime.openOptionsPage();
 });
 
-chrome.action.onClicked.addListener(async (tab) => {
+chrome.action.onClicked.addListener((tab) => onAction(tab));
+
+// Also reachable as self.onAction, so the tests can press the button.
+async function onAction(tab) {
   let origin;
   try {
     origin = new URL(tab.url).origin;
@@ -84,14 +94,7 @@ chrome.action.onClicked.addListener(async (tab) => {
     return;
   }
   const known = (await pairs()).some((p) => sameOrigin(p.from, origin));
-  if (!known) {
-    chrome.tabs.create({
-      url: chrome.runtime.getURL(
-        `src/options.html?from=${encodeURIComponent(origin)}`
-      ),
-    });
-    return;
-  }
+  if (!known && !(await fromSite(tab, origin))) return;
   try {
     await chrome.tabs.sendMessage(tab.id, { type: "toggle" });
   } catch {
@@ -102,7 +105,68 @@ chrome.action.onClicked.addListener(async (tab) => {
     });
     await chrome.tabs.sendMessage(tab.id, { type: "toggle" });
   }
-});
+}
+self.onAction = onAction;
+
+// A site can say what to compare it with, so its visitors need no setup:
+//   <meta name="redline" content="https://example.com">
+//   <meta name="redline-ignore" content="nav, footer, sup">   (optional)
+// Clicking the button on such a page saves the pair, after Chrome asks for
+// access to both sites. Without the tag, or if Chrome will not ask from here,
+// the settings page opens with what is known filled in. True when the pair
+// was saved and Redline can start.
+async function fromSite(tab, origin) {
+  let hint = null;
+  try {
+    const [{ result }] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: () => {
+        const meta = (n) =>
+          document.querySelector(`meta[name="${n}"]`)?.getAttribute("content")?.trim();
+        return { to: meta("redline"), ignore: meta("redline-ignore") };
+      },
+    });
+    if (result?.to) {
+      const to = new URL(result.to, tab.url);
+      if (/^https?:$/.test(to.protocol))
+        hint = { to: to.origin + to.pathname.replace(/\/+$/, ""), ignore: result.ignore };
+    }
+  } catch {
+    // A page extensions may not read, such as the Chrome Web Store.
+  }
+  if (hint) {
+    const origins = [matchFor(origin), matchFor(hint.to)];
+    let granted = false;
+    try {
+      granted =
+        (await chrome.permissions.contains({ origins })) ||
+        (await chrome.permissions.request({ origins }));
+    } catch {
+      // Chrome only asks during the click itself; reading the tag may have
+      // taken too long. The settings page can ask instead.
+    }
+    if (granted) {
+      const list = await pairs();
+      list.push({
+        from: origin,
+        to: hint.to,
+        ignore: hint.ignore ?? "nav, footer",
+        blocks: "",
+        fromSite: true,
+      });
+      await chrome.storage.sync.set({ pairs: list });
+      await sync();
+      return true;
+    }
+  }
+  const q = new URLSearchParams({ from: origin });
+  if (hint) {
+    q.set("to", hint.to);
+    if (hint.ignore) q.set("ignore", hint.ignore);
+  }
+  chrome.tabs.create({ url: chrome.runtime.getURL(`src/options.html?${q}`) });
+  return false;
+}
 
 function sameOrigin(a, b) {
   try {

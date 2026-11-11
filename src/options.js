@@ -94,10 +94,17 @@ document.getElementById("save").onclick = async () => {
 (async () => {
   const { pairs = [] } = await chrome.storage.sync.get("pairs");
   pairs.forEach((p) => addPair(p));
-  const from = new URLSearchParams(location.search).get("from");
+  const q = new URLSearchParams(location.search);
+  const from = q.get("from");
+  const to = q.get("to");
   if (from && !pairs.some((p) => p.from === from)) {
-    const node = addPair({ from, ignore: "nav, footer" });
-    node.querySelector("[name=to]").focus();
-    status.textContent = `Add the site to compare ${from} with, then save.`;
+    const node = addPair({ from, to: to ?? "", ignore: q.get("ignore") ?? "nav, footer" });
+    if (to) {
+      status.textContent = `This site asks to be compared with ${to}. Save to allow it.`;
+      document.getElementById("save").focus();
+    } else {
+      node.querySelector("[name=to]").focus();
+      status.textContent = `Add the site to compare ${from} with, then save.`;
+    }
   } else if (!pairs.length) addPair({ ignore: "nav, footer" });
 })();

@@ -49,6 +49,41 @@ Each pair has two optional fields:
 - **Text blocks**: a CSS selector for what counts as a block. The default is
   `p, h1–h6, li, dt, dd, blockquote, pre, td, th, caption, figure, summary`.
 
+## Let your site set it up
+
+A site can say what Redline should compare it with, so nobody has to fill in
+the settings. Put this in the `<head>` of every page:
+
+```html
+<meta name="redline" content="https://example.com">
+<!-- optional: text that differs but is not content -->
+<meta name="redline-ignore" content="nav, footer, sup">
+```
+
+Clicking the Redline button on a page with the tag saves the pair and starts
+comparing. Chrome asks once for access to both sites. If Chrome will not ask
+straight from the click, the settings page opens with the pair filled in, and
+one click on **Save** finishes it.
+
+This is meant for preview builds, so `content` should be your production
+address. It can stay on production too: there Redline compares the site with
+itself and says nothing changed. Or render it only on previews, for example:
+
+- **Vercel**: when `VERCEL_ENV` is `preview`.
+- **Cloudflare Pages**: when `CF_PAGES_BRANCH` is not your production branch.
+- **Cloudflare Workers Builds**: when `WORKERS_CI_BRANCH` is not your
+  production branch.
+- **Netlify**: when `CONTEXT` is `deploy-preview` or `branch-deploy`.
+
+In Next.js, for instance:
+
+```tsx
+// app/layout.tsx
+export const metadata = {
+  other: { redline: "https://example.com" },
+};
+```
+
 ## How it works
 
 The reference page is fetched by the extension with your cookies for that
