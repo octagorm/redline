@@ -95,8 +95,26 @@ async function onAction(tab) {
   } catch {
     return;
   }
-  const known = RedlinePairs.pairFor(await pairs(), tab.url);
-  if (!known && !(await fromSite(tab, origin))) return;
+  let meta = null;
+  try {
+    [{ result: meta }] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: RedlinePairs.readMeta,
+    });
+  } catch {
+    // A page extensions may not read, such as the Chrome Web Store.
+  }
+  const hint = RedlinePairs.hintFrom(meta, tab.url);
+  const saved = RedlinePairs.pairFor(await pairs(), tab.url);
+  if (hint) {
+    // The page's tag wins; save it if it is new or names another site.
+    const same =
+      saved && saved.from === hint.from && saved.to === hint.to;
+    if (!same && !(await adopt(hint, origin))) return;
+  } else if (!saved) {
+    openSettings({ from: origin });
+    return;
+  }
   try {
     await chrome.tabs.sendMessage(tab.id, { type: "toggle" });
   } catch {
@@ -110,72 +128,41 @@ async function onAction(tab) {
 }
 self.onAction = onAction;
 
-// A site can say what to compare it with, so its visitors need no setup:
-//   <meta name="redline" content="https://example.com">
-//   <meta name="redline-ignore" content="nav, footer, sup">   (optional)
-// Clicking the button on such a page saves the pair, after Chrome asks for
-// access to both sites. Without the tag, or if Chrome will not ask from here,
-// the settings page opens with what is known filled in. True when the pair
-// was saved and Redline can start.
-async function fromSite(tab, origin) {
-  let hint = null;
+// Saves the pair a page's <meta name="redline"> asks for, in place of any
+// saved pair for the same site, after Chrome asks for access to both sites.
+// If Chrome will not ask from here, the settings page opens with the pair
+// filled in. True when the pair was saved and Redline can start.
+async function adopt(hint, origin) {
+  const origins = [matchFor(origin), matchFor(hint.to)];
+  let granted = false;
   try {
-    const [{ result }] = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: () => {
-        const meta = (n) =>
-          document.querySelector(`meta[name="${n}"]`)?.getAttribute("content")?.trim();
-        return {
-          to: meta("redline"),
-          root: meta("redline-root"),
-          ignore: meta("redline-ignore"),
-        };
-      },
-    });
-    if (result?.to) {
-      const to = new URL(result.to, tab.url);
-      if (/^https?:$/.test(to.protocol))
-        hint = {
-          to: RedlinePairs.normalise(to.href),
-          // A preview served from a folder of a site, such as GitHub Pages
-          // previews under /pr-preview/pr-5/, names that folder.
-          from: RedlinePairs.normalise(new URL(result.root || "/", tab.url).href),
-          ignore: result.ignore,
-        };
-    }
+    granted =
+      (await chrome.permissions.contains({ origins })) ||
+      (await chrome.permissions.request({ origins }));
   } catch {
-    // A page extensions may not read, such as the Chrome Web Store.
+    // Chrome only asks during the click itself; reading the tag may have
+    // taken too long. The settings page can ask instead.
   }
-  if (hint) {
-    const origins = [matchFor(origin), matchFor(hint.to)];
-    let granted = false;
+  if (!granted) {
+    openSettings({ from: hint.from, to: hint.to, ignore: hint.ignore });
+    return false;
+  }
+  const list = (await pairs()).filter((p) => {
     try {
-      granted =
-        (await chrome.permissions.contains({ origins })) ||
-        (await chrome.permissions.request({ origins }));
+      return RedlinePairs.normalise(p.from) !== hint.from;
     } catch {
-      // Chrome only asks during the click itself; reading the tag may have
-      // taken too long. The settings page can ask instead.
-    }
-    if (granted) {
-      const list = await pairs();
-      list.push({
-        from: hint.from,
-        to: hint.to,
-        ignore: hint.ignore ?? "nav, footer",
-        blocks: "",
-        fromSite: true,
-      });
-      await chrome.storage.sync.set({ pairs: list });
-      await sync();
       return true;
     }
-  }
-  const q = new URLSearchParams({ from: hint?.from ?? origin });
-  if (hint) {
-    q.set("to", hint.to);
-    if (hint.ignore) q.set("ignore", hint.ignore);
-  }
+  });
+  list.push(hint);
+  await chrome.storage.sync.set({ pairs: list });
+  await sync();
+  return true;
+}
+
+function openSettings(fields) {
+  const q = new URLSearchParams(
+    Object.entries(fields).filter(([, v]) => v)
+  );
   chrome.tabs.create({ url: chrome.runtime.getURL(`src/options.html?${q}`) });
-  return false;
 }

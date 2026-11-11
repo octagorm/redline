@@ -230,6 +230,13 @@ try {
 
   // A site with a <meta name="redline"> tag: pressing the button sets up the
   // pair from the tag and starts.
+  // An old pair for the same address points at another site, as when a
+  // second project runs on the same localhost port. The tag must win.
+  await sw.evaluate(async () => {
+    const { pairs } = await chrome.storage.sync.get("pairs");
+    pairs.push({ from: "http://localhost:47313/pr-preview/pr-5", to: "http://127.0.0.1:47399", ignore: "", blocks: "" });
+    await chrome.storage.sync.set({ pairs });
+  });
   await tab.goto("http://localhost:47313/pr-preview/pr-5/");
   await tab.waitForTimeout(500);
   await sw.evaluate(async () => {
@@ -244,6 +251,7 @@ try {
     ),
     "the pair from the tag is saved"
   );
+  assert.ok(!saved.some((p) => p.to === "http://127.0.0.1:47399"), "the old pair is replaced");
   assert.deepEqual(
     await tab.$$eval("mark.redline-new", (m) => m.map((x) => x.textContent)),
     ["whole", "redrawn"]

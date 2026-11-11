@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Redline",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Highlights, word by word, how a page differs from the same page on another site, such as your dev server against production.",
   "permissions": [
     "storage",

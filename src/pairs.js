@@ -52,5 +52,39 @@ globalThis.RedlinePairs ??= (() => {
     return u.origin + u.pathname.replace(/\/+$/, "");
   }
 
-  return { pairFor, referenceFor, normalise };
+  // A site can say what to compare it with, so nobody has to set it up:
+  //   <meta name="redline" content="https://example.com">
+  //   <meta name="redline-root" content="/pr-preview/pr-5/">   (optional)
+  //   <meta name="redline-ignore" content="nav, footer, sup">  (optional)
+  // `meta` holds those three contents, as readMeta() returns them. The tag
+  // wins over a saved pair, so a second project served on the same
+  // localhost port compares with its own reference, not the last one's.
+  function hintFrom(meta, href) {
+    if (!meta?.to) return null;
+    try {
+      const to = new URL(meta.to, href);
+      if (!/^https?:$/.test(to.protocol)) return null;
+      let from = normalise(new URL(meta.root || "/", href).href);
+      // A root the page is not under is a mistake; fall back to the site.
+      if (!pairFor([{ from }], href)) from = new URL(href).origin;
+      return {
+        from,
+        to: normalise(to.href),
+        ignore: meta.ignore ?? "nav, footer",
+        blocks: "",
+        fromSite: true,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  // Runs in the page. Self-contained, so it can be injected on its own.
+  function readMeta() {
+    const meta = (n) =>
+      document.querySelector(`meta[name="${n}"]`)?.getAttribute("content")?.trim();
+    return { to: meta("redline"), root: meta("redline-root"), ignore: meta("redline-ignore") };
+  }
+
+  return { pairFor, referenceFor, normalise, hintFrom, readMeta };
 })();

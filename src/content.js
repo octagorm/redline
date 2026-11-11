@@ -26,9 +26,13 @@
 
   // ---------- settings ----------
 
+  // The page's own <meta name="redline"> first, then the saved pairs.
   async function findPair() {
+    const P = globalThis.RedlinePairs;
+    const hint = P.hintFrom(P.readMeta(), location.href);
+    if (hint) return hint;
     const { pairs = [] } = await chrome.storage.sync.get("pairs");
-    return globalThis.RedlinePairs.pairFor(pairs, location.href);
+    return P.pairFor(pairs, location.href);
   }
 
   function wanted() {
@@ -213,7 +217,11 @@
       note = " (not on the reference: 404)";
     } else {
       render(
-        res.status ? `reference answered ${res.status}` : "could not reach the reference",
+        res.status
+          ? `reference answered ${res.status}`
+          : pair.fromSite
+            ? `click the Redline button to allow ${new URL(url).host}`
+            : "could not reach the reference",
         res.error ?? url
       );
       return;

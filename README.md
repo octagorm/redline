@@ -65,6 +65,10 @@ comparing. Chrome asks once for access to both sites. If Chrome will not ask
 straight from the click, the settings page opens with the pair filled in, and
 one click on **Save** finishes it.
 
+The tag wins over a saved pair. So when several projects take turns on
+`localhost:3000`, each one with the tag is compared with its own reference.
+A project without the tag uses whatever pair is saved for that address.
+
 This is meant for preview builds, so `content` should be your production
 address. It can stay on production too: there Redline compares the site with
 itself and says nothing changed. Or render it only on previews, for example:

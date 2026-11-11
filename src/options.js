@@ -98,7 +98,16 @@ document.getElementById("save").onclick = async () => {
   const q = new URLSearchParams(location.search);
   const from = q.get("from");
   const to = q.get("to");
-  if (from && !pairs.some((p) => p.from === from)) {
+  const existing = from && [...list.querySelectorAll(".pair")].find(
+    (n) => n.querySelector("[name=from]").value === from
+  );
+  if (existing && to && existing.querySelector("[name=to]").value !== to) {
+    // The site's tag names another reference than the saved pair.
+    existing.querySelector("[name=to]").value = to;
+    if (q.get("ignore")) existing.querySelector("[name=ignore]").value = q.get("ignore");
+    status.textContent = `This site asks to be compared with ${to} now. Save to allow it.`;
+    document.getElementById("save").focus();
+  } else if (from && !existing) {
     const node = addPair({ from, to: to ?? "", ignore: q.get("ignore") ?? "nav, footer" });
     if (to) {
       status.textContent = `This site asks to be compared with ${to}. Save to allow it.`;
