@@ -79,9 +79,11 @@
            text-decoration:underline; cursor:pointer; }
   .keys { cursor:help; display:inline-flex; gap:6px; align-items:center; }
   .keys > span { opacity:.75; }
-  .keys .k-ok, .keys .k-no { opacity:1; color:#fff; padding:1px 5px; border-radius:4px; }
-  .keys .k-ok { background:#3c9a5f; }
-  .keys .k-no { background:#d9534a; box-shadow:0 0 0 1px rgba(255,255,255,.5); }
+  .keys .k-ok, .keys .k-no { opacity:1; font-weight:700; }
+  .keys .k-ok { color:#1d6b3a; }
+  .keys .k-no { color:#a3241c; }
+  .b.removed .keys .k-ok { color:#c9f2d6; }
+  .b.removed .keys .k-no { color:#ffd9d4; }
   .todo { font-weight:700; }
   .todo.done { font-weight:400; text-decoration:none; cursor:default; }
   /* Quick tooltips: the browser's own take a second to appear. */
@@ -129,7 +131,7 @@ B       next view: all, added, removed
 A       approve the change
 X       reject it
 C       add a note or wording
-P       pages: which pages differ"><span>J↓</span><span>K↑</span><span>B</span><span class="k-ok">A ✓</span><span class="k-no">X ✗</span><span>C ✎</span><span>P</span></span>
+P       pages: which pages differ"><span>J↓</span><span>K↑</span><span>B</span><span class="k-ok">A</span><span class="k-no">X</span><span>C</span><span>P</span></span>
   <span class="modes" hidden>
     <button data-mode="all" data-tip="New words highlighted, removed ones struck through (B)">all</button>
     <button data-mode="added" data-tip="Only what is new (B)">added</button>
