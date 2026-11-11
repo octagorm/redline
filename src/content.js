@@ -9,7 +9,18 @@
 
   const R = globalThis.Redline;
   const KEY = "redline";
-  const state = { on: false, before: false, count: null, current: null };
+  const MODES = ["all", "added", "removed"];
+  const MODE_KEY = "redline-mode";
+  const state = { on: false, mode: savedMode(), count: null, current: null };
+
+  // The mode sticks for the tab, like being on does.
+  function savedMode() {
+    try {
+      const m = sessionStorage.getItem(MODE_KEY);
+      if (MODES.includes(m)) return m;
+    } catch {}
+    return "all";
+  }
   let pair = null;
   let runId = 0;
 
@@ -62,7 +73,9 @@
        border-radius:8px; background:#e0aa3e; color:#14110a;
        font:12px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
        box-shadow:0 2px 10px rgba(0,0,0,.25); }
-  .b.before { background:#d9534a; color:#fff; }
+  .b.removed { background:#d9534a; color:#fff; }
+  .modes { display:flex; gap:8px; }
+  .modes button[aria-pressed=true] { text-decoration:none; font-weight:700; }
   button { background:none; border:0; padding:0; color:inherit; font:inherit;
            text-decoration:underline; cursor:pointer; }
   .keys { opacity:.7; }
@@ -71,8 +84,12 @@
 <div class="b">
   <span class="msg"></span>
   <button class="count" hidden></button>
-  <span class="keys" hidden title="J: next change. K: previous change. B: before or after.">J K B</span>
-  <button class="mode" hidden aria-pressed="false"></button>
+  <span class="keys" hidden title="J: next change. K: previous change. B: next mode (all, added, removed).">J K B</span>
+  <span class="modes" hidden>
+    <button data-mode="all" title="New words highlighted, removed words struck through">all</button>
+    <button data-mode="added" title="Only what is new">added</button>
+    <button data-mode="removed" title="The other site's wording, removed words struck through">removed</button>
+  </span>
   <button class="again" title="Compare again">again</button>
   <button class="off" title="Turn Redline off for this tab">hide</button>
 </div>`;
@@ -82,12 +99,13 @@
       msg: $(".msg"),
       count: $(".count"),
       keys: $(".keys"),
-      mode: $(".mode"),
+      modes: $(".modes"),
       again: $(".again"),
       off: $(".off"),
     };
     ui.count.onclick = () => step(1, true);
-    ui.mode.onclick = () => setBefore(!state.before);
+    for (const b of root.querySelectorAll("[data-mode]"))
+      b.onclick = () => setMode(b.dataset.mode);
     ui.again.onclick = () => run();
     ui.off.onclick = () => turnOff();
     document.documentElement.append(host);
@@ -103,11 +121,11 @@
     u.box.title = title;
     u.count.hidden = !has;
     u.keys.hidden = !has;
-    u.mode.hidden = !has;
+    u.modes.hidden = !has;
     if (has) u.count.textContent = `${n} ${n === 1 ? "change" : "changes"}`;
-    u.mode.textContent = state.before ? "showing before" : "showing after";
-    u.mode.setAttribute("aria-pressed", String(state.before));
-    u.box.classList.toggle("before", state.before);
+    for (const b of u.modes.children)
+      b.setAttribute("aria-pressed", String(b.dataset.mode === state.mode));
+    u.box.classList.toggle("removed", state.mode === "removed");
     chrome.runtime
       .sendMessage({
         type: "badge",
@@ -161,7 +179,7 @@
     }
     state.count = null;
     state.current = null;
-    setBefore(false);
+    setMode(state.mode);
     R.clear();
     addStyle();
     document.documentElement.classList.add("redline-on");
@@ -226,7 +244,7 @@
     );
   }
 
-  // Swapping before and after shows and hides blocks, which would move the
+  // Switching modes shows and hides blocks, which would move the
   // page under the reader. Pin a block both views share, nearest the middle of
   // the window, and scroll so it stays where it was.
   function pinned(change) {
@@ -250,16 +268,20 @@
     if (best) scrollBy(0, best.getBoundingClientRect().top - before);
   }
 
-  function setBefore(on) {
-    if (state.on && state.count && on !== state.before)
-      return pinned(() => setBeforeNow(on));
-    setBeforeNow(on);
+  function setMode(mode) {
+    if (state.on && state.count && mode !== state.mode)
+      return pinned(() => setModeNow(mode));
+    setModeNow(mode);
   }
 
-  function setBeforeNow(on) {
-    state.before = on;
+  function setModeNow(mode) {
+    state.mode = mode;
+    try {
+      sessionStorage.setItem(MODE_KEY, mode);
+    } catch {}
     state.current = null;
-    document.documentElement.classList.toggle("redline-before", on);
+    const html = document.documentElement.classList;
+    for (const m of MODES) html.toggle(m === "removed" ? "redline-removed-only" : `redline-${m}`, m === mode);
     if (ui) render(ui.msg.textContent, ui.box.title);
   }
 
@@ -275,19 +297,24 @@
     remember(false);
     R.clear();
     state.count = null;
-    document.documentElement.classList.remove("redline-on", "redline-before");
+    document.documentElement.classList.remove(
+      "redline-on",
+      "redline-all",
+      "redline-added",
+      "redline-removed-only"
+    );
     styleEl?.remove();
     host?.remove();
     host = null;
     chrome.runtime.sendMessage({ type: "badge", text: "" }).catch(() => {});
   }
 
-  // ---------- keys: J next, K previous, B before/after ----------
+  // ---------- keys: J next, K previous, B next mode ----------
 
   function step(dir, fromTop = false) {
     const all = [
       ...document.querySelectorAll(
-        state.before
+        state.mode === "removed"
           ? ".redline-old"
           : "[data-redline-new], [data-redline-changed], .redline-removed"
       ),
@@ -320,7 +347,8 @@
       if (t?.closest?.("input, textarea, select, [contenteditable]") || t?.isContentEditable)
         return;
       const key = e.key.toLowerCase();
-      if (key === "b") setBefore(!state.before);
+      if (key === "b")
+        setMode(MODES[(MODES.indexOf(state.mode) + 1) % MODES.length]);
       else if (key === "j") step(1);
       else if (key === "k") step(-1);
       else return;

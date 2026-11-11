@@ -3,15 +3,18 @@
 A Chrome extension that shows, word by word, how the page you are on differs
 from the same page on another site. Point it at your dev server and production
 (or a second local server running `main`), and while you read the page you are
-working on, every new word is highlighted and every removed paragraph is marked.
+working on, new words are highlighted and removed words are struck through
+right where they were.
 
-![New words highlighted, a removed paragraph marked with a dashed line](docs/after.png)
+![New words highlighted, removed words struck through beside them, a removed paragraph shown struck through](docs/all.png)
 
-Press <kbd>B</kbd> to see the other site's wording instead, with the removed
-words struck through. <kbd>J</kbd> and <kbd>K</kbd> go to the next and
-previous change. The badge in the corner counts the changed blocks.
+Press <kbd>B</kbd> to switch between three views: **all** (the default, as
+above), **added** (only what is new, with a removed paragraph shown as a
+dashed line) and **removed** (the other site's wording, removed words struck
+through). <kbd>J</kbd> and <kbd>K</kbd> go to the next and previous change.
+The badge in the corner counts the changed blocks and switches views too.
 
-![The same page in "before": the old wording, removed words struck through](docs/before.png)
+![The "removed" view: the other site's wording, removed words struck through](docs/removed.png)
 
 ## Install
 

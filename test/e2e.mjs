@@ -144,14 +144,55 @@ try {
   );
   assert.equal(await tab.$$eval(".redline-removed", (e) => e.length), 1, "one removed block");
   assert.match(await badge(), /3 changes/);
-  await tab.screenshot({ path: path.join(out, "after.png") });
+  const visibleText = (sel) =>
+    tab.$$eval(sel, (els) =>
+      els.filter((e) => e.getClientRects().length).map((e) => e.textContent.trim())
+    );
+  const changed = () =>
+    tab.$eval("p[data-redline-changed]", (p) => p.innerText.replace(/\s+/g, " "));
 
-  // B shows the reference's wording with removed words struck through.
+  // "all", the default: removed words struck through beside the new ones, and
+  // the removed paragraph shown in full.
+  assert.deepEqual(await visibleText(".redline-gone del"), ["drawn"]);
+  assert.equal(
+    await changed(),
+    "A clock that shows the whole sky above you, drawn redrawn every second."
+  );
+  assert.ok(await tab.isVisible("text=This paragraph is going away"));
+  await tab.screenshot({ path: path.join(out, "all.png") });
+
+  // B: "added", only what is new; the removed paragraph is a dashed line.
   await tab.keyboard.press("b");
-  const struck = await tab.$$eval(".redline-old del", (d) => d.map((x) => x.textContent));
+  assert.deepEqual(await visibleText(".redline-gone del"), []);
+  assert.equal(
+    await changed(),
+    "A clock that shows the whole sky above you, redrawn every second."
+  );
+  assert.ok(
+    (await tab.$eval(".redline-removed", (e) => e.offsetHeight)) <= 2,
+    "the removed paragraph is only a line"
+  );
+  await tab.screenshot({ path: path.join(out, "added.png") });
+
+  // B: "removed", the reference's wording with removed words struck through.
+  await tab.keyboard.press("b");
+  const struck = await visibleText(".redline-old del");
   assert.ok(struck.includes("drawn"), "the old word is struck through");
   assert.ok(await tab.isVisible("text=This paragraph is going away"));
-  await tab.screenshot({ path: path.join(out, "before.png") });
+  assert.ok(!(await tab.isVisible("text=A brand new paragraph")));
+  await tab.screenshot({ path: path.join(out, "removed.png") });
+
+  // B again: back to "all", and the mode sticks across page loads.
+  await tab.keyboard.press("b");
+  await tab.keyboard.press("b");
+  await tab.reload();
+  await waitBadge(/change/);
+  assert.equal(
+    await tab.evaluate(() => document.documentElement.classList.contains("redline-added")),
+    true,
+    "mode remembered"
+  );
+  await tab.keyboard.press("b");
   await tab.keyboard.press("b");
 
   // It stays on across navigation, and follows client-side navigation.

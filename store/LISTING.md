@@ -21,9 +21,8 @@ Redline shows what you changed on a website while you read it.
 
 Pair the site you are working on (say http://localhost:3000) with the site to compare it with (say your live site, or a second local server running the main branch). Then turn Redline on in a tab with the toolbar button, Alt+Shift+R, or ?redline in the address:
 
-• New and changed words are highlighted where they stand.
-• Removed paragraphs are marked with a dashed red line.
-• Press B to see the other site's wording instead, with removed words struck through.
+• New words are highlighted, and removed words are struck through right where they were.
+• Press B to switch views: all changes, only what was added, or only what was removed.
 • Press J and K to jump to the next and previous change.
 • The badge counts the changed blocks.
 
@@ -39,11 +38,11 @@ Redline has no servers, analytics or accounts. It only talks to the sites you pa
 
 **Graphic assets:**
 - Store icon: `../icons/128.png`
-- Screenshots (1280×800): `screenshot-1-after.png`, `screenshot-2-before.png`
+- Screenshots (1280×800): `screenshot-1-all.png`, `screenshot-2-added.png`, `screenshot-3-removed.png`
 - Small promo tile (440×280): `promo-440x280.png`
 
-To remake the screenshots: `STORE=1 npm test` (writes `after.png` and
-`before.png` here), and open `tile.html` at 440×280 for the tile.
+To remake the screenshots: `STORE=1 npm test` (writes `all.png`, `added.png` and
+`removed.png` here; rename them), and open `tile.html` at 440×280 for the tile.
 
 **Homepage URL:** https://github.com/octagorm/redline
 

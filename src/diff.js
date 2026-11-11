@@ -38,7 +38,7 @@ globalThis.Redline ??= (() => {
     "HR",
   ]);
   // Redline's own nodes, never read as page text.
-  const OWN = ".redline-old, #redline-host";
+  const OWN = ".redline-old, .redline-gone, #redline-host";
 
   // A whitespace-separated word. It may span several text nodes
   // (Hildeyard<em>'s</em>), and an image contributes a word with no pieces.
@@ -155,25 +155,60 @@ globalThis.Redline ??= (() => {
     return (2 * both) / (x.size + y.size || 1);
   }
 
-  function wrapWords(list) {
-    const byNode = new Map();
-    for (const tok of list)
-      for (const p of tok.pieces)
-        byNode.set(p.node, [...(byNode.get(p.node) ?? []), p]);
-    for (const [node, pieces] of byNode) {
+  // Marks a block's new words with <mark> and puts its removed words back in
+  // with <del>, where they stood. `fresh` are the new tokens; each of `gaps` is
+  // a run of removed words and the token it follows (-1: the block's start).
+  function markUp(el, toks, fresh, gaps) {
+    const ops = new Map(); // text node -> its marks and insertions
+    const add = (node, op) => ops.set(node, [...(ops.get(node) ?? []), op]);
+    for (const tok of fresh)
+      for (const p of tok.pieces) add(p.node, { kind: "mark", ...p });
+
+    const gone = (text, lead) => {
+      // The space goes inside the wrapper, so hiding it leaves no gap.
+      const span = document.createElement("span");
+      span.className = "redline-gone";
+      const del = document.createElement("del");
+      del.textContent = text;
+      if (lead) span.append(" ", del);
+      else span.append(del, " ");
+      return span;
+    };
+    for (const { after, text } of gaps) {
+      const prev = toks[after]?.pieces.at(-1);
+      if (prev) {
+        add(prev.node, { kind: "insert", pos: prev.end, el: gone(text, true) });
+        continue;
+      }
+      const next = toks.slice(after + 1).find((t) => t.pieces.length)?.pieces[0];
+      if (next) add(next.node, { kind: "insert", pos: next.start, el: gone(text, false) });
+      else el.append(gone(text, true));
+    }
+
+    for (const [node, list] of ops) {
       // Neighbouring new words become one run, so the highlight carries
       // across the spaces between them.
       const text = node.textContent ?? "";
       const runs = [];
-      for (const p of pieces.sort((a, b) => a.start - b.start)) {
+      for (const p of list
+        .filter((o) => o.kind === "mark")
+        .sort((a, b) => a.start - b.start)) {
         const last = runs[runs.length - 1];
         if (last && !text.slice(last.end, p.start).trim()) last.end = p.end;
-        else runs.push({ start: p.start, end: p.end });
+        else runs.push({ kind: "mark", pos: p.start, end: p.end });
       }
-      // Back to front, so earlier offsets stay valid as the node is split.
-      for (const p of runs.reverse()) {
-        const word = node.splitText(p.start);
-        word.splitText(p.end - p.start);
+      // Back to front, so earlier offsets stay valid as the node is split. At
+      // the same offset a mark goes first, so a deletion lands before it.
+      const all = [...runs, ...list.filter((o) => o.kind === "insert")].sort(
+        (a, b) => b.pos - a.pos || (a.kind === "mark" ? -1 : 1)
+      );
+      for (const op of all) {
+        if (op.kind === "insert") {
+          node.splitText(op.pos).before(op.el);
+          continue;
+        }
+        const word = node.splitText(op.pos);
+        word.splitText(op.end - op.pos);
         const mark = document.createElement("mark");
         mark.className = "redline-new";
         word.replaceWith(mark);
@@ -262,7 +297,9 @@ globalThis.Redline ??= (() => {
             break;
           }
         const b = at(i);
-        count++;
+        // A block with nowhere to show on the live page (a script replaced
+        // it) cannot be marked, so it is not counted either.
+        if (b) count++;
         if (match < 0) {
           b?.el.setAttribute("data-redline-new", "");
           continue;
@@ -290,7 +327,16 @@ globalThis.Redline ??= (() => {
         // A changed word with no text of its own (an image) marks the block.
         if (fresh.some((t) => !t.pieces.length))
           b.el.setAttribute("data-redline-new", "");
-        wrapWords(fresh);
+        // Runs of removed words, each after the kept word that precedes it.
+        const gaps = [];
+        let after = -1;
+        let y = 0;
+        for (const [x, yy] of [...same, [b.toks.length, was.length]]) {
+          if (y < yy) gaps.push({ after, text: was.slice(y, yy).join(" ") });
+          after = x;
+          y = yy + 1;
+        }
+        markUp(b.el, b.toks, fresh, gaps);
       }
       for (let o = nextOld; o < kj; o++) {
         removed(old[o], ki);
@@ -304,7 +350,7 @@ globalThis.Redline ??= (() => {
 
   // Undoes show(). The text nodes it split stay split, which reads the same.
   function clear(doc = document) {
-    doc.querySelectorAll(".redline-old").forEach((e) => e.remove());
+    doc.querySelectorAll(".redline-old, .redline-gone").forEach((e) => e.remove());
     doc
       .querySelectorAll("mark.redline-new")
       .forEach((m) => m.replaceWith(...m.childNodes));
@@ -316,8 +362,11 @@ globalThis.Redline ??= (() => {
       });
   }
 
+  // Three modes, as a class on <html>: "all" (the default) shows new words
+  // and removed ones side by side; "added" only the new words; "removed" the
+  // reference's wording, removed words struck through.
   const CSS = `
-html.redline-on [data-redline-new] {
+html.redline-on:not(.redline-removed-only) [data-redline-new] {
   background: rgba(240, 190, 80, 0.16) !important;
   box-shadow: -10px 0 0 rgba(240, 190, 80, 0.16), -13px 0 0 #e0aa3e !important;
 }
@@ -330,20 +379,31 @@ html.redline-on mark.redline-new {
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }
+html.redline-on .redline-gone del,
+html.redline-on .redline-old del {
+  text-decoration: line-through !important;
+  text-decoration-color: #d9534a !important;
+  background: rgba(230, 90, 80, 0.3) !important;
+  color: inherit !important;
+  border-radius: 3px;
+  padding: 1px 3px;
+  margin: 0 -3px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.redline-gone { display: none !important; }
+html.redline-all .redline-gone { display: inline !important; }
 .redline-old { display: none !important; }
-html.redline-before .redline-old {
+html.redline-removed-only .redline-old,
+html.redline-all .redline-old.redline-removed {
   display: revert !important;
   background: rgba(230, 90, 80, 0.12) !important;
   box-shadow: -10px 0 0 rgba(230, 90, 80, 0.12), -13px 0 0 #d9534a !important;
 }
-html.redline-before .redline-old del {
-  background: rgba(230, 90, 80, 0.32);
-  text-decoration-color: #d9534a;
-  color: inherit;
-}
-html.redline-before [data-redline-changed],
-html.redline-before [data-redline-new] { display: none !important; }
-html.redline-on:not(.redline-before) .redline-old.redline-removed {
+html.redline-all .redline-old.redline-removed del { background: none !important; }
+html.redline-removed-only [data-redline-changed],
+html.redline-removed-only [data-redline-new] { display: none !important; }
+html.redline-added .redline-old.redline-removed {
   display: block !important;
   height: 0 !important;
   min-height: 0 !important;
