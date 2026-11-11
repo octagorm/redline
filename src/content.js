@@ -115,8 +115,8 @@
 </div>
 <div class="b">
   <span class="msg"></span>
-  <button class="count" hidden></button>
-  <span class="reviewed" hidden data-tip="Approved and rejected changes on this page"></span>
+  <button class="count" hidden data-tip="Changes on this page. Click to go to the first"></button>
+  <span class="reviewed" hidden data-tip="Of this page's changes: ✓ approved, ✗ rejected, ✎ with a note or wording"></span>
   <span class="keys" hidden data-tip="J / K   next or previous change
 B       next view: all, added, removed
 A       approve the change
@@ -179,8 +179,9 @@ C       add a note or wording">J K B A X C</span>
     u.modes.hidden = !has;
     if (has) u.count.textContent = `${n} ${n === 1 ? "change" : "changes"}`;
     const sum = has && reviews ? RV().pageSummary(reviews, rest()) : null;
-    u.reviewed.hidden = !(sum && (sum.ok || sum.no));
-    if (sum) u.reviewed.textContent = [sum.ok && `${sum.ok} ✓`, sum.no && `${sum.no} ✗`].filter(Boolean).join(" ");
+    const t = RV()?.tally(sum) ?? "";
+    u.reviewed.hidden = !t;
+    u.reviewed.textContent = t;
     const fb = reviews ? RV().feedback(reviews).length : 0;
     u.notes.hidden = !fb;
     if (fb) u.notes.textContent = `copy notes (${fb})`;
@@ -352,6 +353,8 @@ C       add a note or wording">J K B A X C</span>
     reviews = await RV().update(pair, rest(), change, patch);
     applyReviews();
     render(ui?.msg.textContent, ui?.box.title);
+    // The pages list shows each page's progress, so it follows along.
+    if (ui && !ui.panel.hidden && !signal && scan) listPages();
   }
 
   async function copyNotes() {
@@ -695,11 +698,10 @@ C       add a note or wording">J K B A X C</span>
         tag.textContent = `${it.count} ${it.count === 1 ? "change" : "changes"}`;
         // Review progress, for pages opened since their text last changed.
         const sum = reviews && RV().pageSummary(reviews, it.path);
-        if (sum && sum.total === it.count && (sum.ok || sum.no))
+        const t = RV().tally(sum);
+        if (sum && sum.total === it.count && t)
           tag.textContent =
-            sum.ok === sum.total
-              ? "all approved"
-              : `${it.count} · ${[sum.ok && `${sum.ok} ✓`, sum.no && `${sum.no} ✗`].filter(Boolean).join(" ")}`;
+            sum.ok === sum.total && !sum.noted ? "all approved" : `${it.count} · ${t}`;
       }
       li.append(a, tag);
       u.plist.append(li);

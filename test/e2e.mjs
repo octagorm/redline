@@ -265,7 +265,7 @@ try {
   await tab.evaluate(`${toolsRoot}.querySelector("form").requestSubmit()`);
   await tab.waitForFunction(`document.querySelector("p[data-redline-new]").hasAttribute("data-redline-noted")`);
   console.log("reviewed:", await badge());
-  assert.match(await badge(), /1 ✓ 1 ✗/);
+  assert.match(await badge(), /1 ✓ 1 ✗ 1 ✎/);
   assert.match(await badge(), /copy notes \(1\)/);
   await tab.screenshot({ path: path.join(out, "review.png") });
   const notes = await sw.evaluate(async () => {
@@ -337,7 +337,7 @@ try {
   const listed = await pagesList();
   console.log("pages:", listed);
   await tab.screenshot({ path: path.join(out, "pages.png") });
-  assert.deepEqual(listed, ["/ 3 · 1 ✓ 1 ✗", "/about 1 change", "/fresh new page", "/gone removed page"]);
+  assert.deepEqual(listed, ["/ 3 · 1 ✓ 1 ✗ 1 ✎", "/about 1 change", "/fresh new page", "/gone removed page"]);
 
   // A huge site: checks a batch at a time, nearest first, and says how much
   // it has checked.

@@ -43,18 +43,20 @@ globalThis.RedlineReview ??= (() => {
     return data;
   }
 
-  // { total, ok, no } for a page, or null when it has not been opened.
+  // { total, ok, no, noted } for a page, or null when it has not been opened.
   function pageSummary(data, path) {
     const page = data.pages[path];
     if (!page) return null;
     let ok = 0;
     let no = 0;
+    let noted = 0;
     for (const id of page.ids) {
-      const s = data.entries[id]?.state;
-      if (s === "ok") ok++;
-      else if (s === "no") no++;
+      const e = data.entries[id];
+      if (e?.state === "ok") ok++;
+      else if (e?.state === "no") no++;
+      if (e?.note || e?.suggestion) noted++;
     }
-    return { total: page.ids.length, ok, no };
+    return { total: page.ids.length, ok, no, noted };
   }
 
   // The reviews still current, worth sending on: rejections, notes and
@@ -95,5 +97,13 @@ globalThis.RedlineReview ??= (() => {
     return lines.join("\n");
   }
 
-  return { load, setPage, update, pageSummary, feedback, markdown };
+  // "1 ✓ 1 ✗ 1 ✎", or "" when nothing on the page is reviewed.
+  function tally(sum) {
+    if (!sum) return "";
+    return [sum.ok && `${sum.ok} ✓`, sum.no && `${sum.no} ✗`, sum.noted && `${sum.noted} ✎`]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  return { load, setPage, update, pageSummary, tally, feedback, markdown };
 })();
