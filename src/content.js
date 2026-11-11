@@ -71,11 +71,20 @@
        font:12px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
        box-shadow:0 2px 10px rgba(0,0,0,.25); }
   .b.removed { background:#d9534a; color:#fff; }
+  .b { flex-wrap:wrap; justify-content:flex-end; row-gap:6px; max-width:calc(100vw - 32px); box-sizing:border-box; }
+  .b > *, .modes > * { white-space:nowrap; }
   .modes { display:flex; gap:8px; }
   .modes button[aria-pressed=true] { text-decoration:none; font-weight:700; }
   button { background:none; border:0; padding:0; color:inherit; font:inherit;
            text-decoration:underline; cursor:pointer; }
-  .keys { opacity:.7; }
+  .keys { opacity:.7; cursor:help; }
+  /* Quick tooltips: the browser's own take a second to appear. */
+  [data-tip] { position:relative; }
+  [data-tip]:hover::after { content:attr(data-tip); position:absolute; right:0;
+    bottom:calc(100% + 10px); width:max-content; max-width:300px; white-space:pre;
+    padding:6px 8px; border-radius:6px; background:#1c1a17; color:#f3efe6;
+    font:12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; text-align:left;
+    box-shadow:0 2px 8px rgba(0,0,0,.3); pointer-events:none; z-index:1; }
   [hidden] { display:none; }
   .wrap { display:flex; flex-direction:column; align-items:flex-end; gap:8px; }
   .panel { max-height:50vh; overflow:auto; min-width:260px; max-width:min(440px, 90vw);
@@ -107,17 +116,21 @@
 <div class="b">
   <span class="msg"></span>
   <button class="count" hidden></button>
-  <span class="reviewed" hidden title="Approved and rejected changes on this page"></span>
-  <span class="keys" hidden title="J / K: next or previous change. B: next view (all, added, removed). A: approve, X: reject, C: note, for the change with the toolbar.">J K B A X C</span>
+  <span class="reviewed" hidden data-tip="Approved and rejected changes on this page"></span>
+  <span class="keys" hidden data-tip="J / K   next or previous change
+B       next view: all, added, removed
+A       approve the change
+X       reject it
+C       add a note or wording">J K B A X C</span>
   <span class="modes" hidden>
-    <button data-mode="all" title="New words highlighted, removed words struck through">all</button>
-    <button data-mode="added" title="Only what is new">added</button>
-    <button data-mode="removed" title="The other site's wording, removed words struck through">removed</button>
+    <button data-mode="all" data-tip="New words highlighted, removed ones struck through (B)">all</button>
+    <button data-mode="added" data-tip="Only what is new (B)">added</button>
+    <button data-mode="removed" data-tip="The other site's wording, removed words struck through (B)">removed</button>
   </span>
-  <button class="pages" title="Which pages of the site differ">pages</button>
-  <button class="notes" hidden title="Copy your rejections, notes and suggested wording, for whoever makes the changes">copy notes</button>
-  <button class="again" title="Compare again">again</button>
-  <button class="off" title="Turn Redline off for this tab">hide</button>
+  <button class="pages" data-tip="Which pages of the site differ">pages</button>
+  <button class="notes" hidden data-tip="Copy your rejections, notes and suggested wording as a list">copy notes</button>
+  <button class="again" data-tip="Compare again">again</button>
+  <button class="off" data-tip="Turn Redline off for this tab">hide</button>
 </div>
 </div>`;
     const $ = (s) => root.querySelector(s);
@@ -368,15 +381,21 @@
     if (tools.host?.isConnected) return tools.root;
     tools.host = document.createElement("div");
     tools.host.id = "redline-tools";
-    tools.host.style.cssText = "all:initial;position:fixed;z-index:2147483646;top:0;left:0;";
+    tools.host.style.cssText = "all:initial;display:block;width:max-content;position:fixed;z-index:2147483646;top:0;left:0;";
     const root = (tools.root = tools.host.attachShadow({ mode: "open" }));
     root.innerHTML = `
 <style>
-  .t { display:flex; gap:2px; padding:3px; border-radius:7px; background:#1c1a17;
+  :host { display:block; width:max-content; }
+  .t { display:inline-flex; gap:2px; padding:3px; border-radius:7px; background:#1c1a17;
        box-shadow:0 2px 8px rgba(0,0,0,.3); font:13px/1 system-ui, sans-serif; }
   .t button { border:0; background:none; color:#f3efe6; width:26px; height:24px;
               border-radius:5px; cursor:pointer; font:inherit; }
   .t button:hover { background:#3a362f; }
+  .t button[data-tip] { position:relative; }
+  .t button[data-tip]:hover::after { content:attr(data-tip); position:absolute; right:0;
+    top:calc(100% + 6px); width:max-content; white-space:pre; padding:4px 7px;
+    border-radius:5px; background:#3a362f; color:#f3efe6;
+    font:12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; pointer-events:none; }
   .t button.ok[aria-pressed=true] { background:#3c9a5f; }
   .t button.no[aria-pressed=true] { background:#d9534a; }
   .t button.note[aria-pressed=true] { background:#8a6d2f; }
@@ -393,9 +412,9 @@
   [hidden] { display:none !important; }
 </style>
 <div class="t">
-  <button class="ok" title="Approve (A)">✓</button>
-  <button class="no" title="Reject (X)">✗</button>
-  <button class="note" title="Note or suggested wording (C)">✎</button>
+  <button class="ok" data-tip="Approve   A">✓</button>
+  <button class="no" data-tip="Reject   X">✗</button>
+  <button class="note" data-tip="Note or wording   C">✎</button>
 </div>
 <form hidden>
   <textarea name="note" rows="2" placeholder="Note"></textarea>
@@ -410,13 +429,17 @@
     $(".ok").onclick = () => toggleState("ok");
     $(".no").onclick = () => toggleState("no");
     $(".note").onclick = () => openNote();
-    $(".cancel").onclick = () => ($("form").hidden = true);
+    $(".cancel").onclick = () => {
+      $("form").hidden = true;
+      placeTools();
+    };
     $(".suggest").onclick = () => {
       const sug = $("[name=suggestion]");
       sug.hidden = false;
       if (!sug.value) sug.value = tools.change.kind === "removed" ? tools.change.before : tools.change.after;
-      sug.focus();
       $(".suggest").hidden = true;
+      placeTools();
+      sug.focus({ preventScroll: true });
     };
     $("form").onsubmit = (e) => {
       e.preventDefault();
@@ -452,7 +475,8 @@
     sug.hidden = !e.suggestion;
     form.querySelector(".suggest").hidden = !!e.suggestion;
     form.hidden = false;
-    form.querySelector("[name=note]").focus();
+    placeTools();
+    form.querySelector("[name=note]").focus({ preventScroll: true });
   }
 
   // The element a change is shown by in the current mode.
@@ -480,14 +504,23 @@
     placeTools();
   }
 
-  // Beside the change's top right corner, inside the window.
+  // Beside the change's top right corner, and always wholly inside the
+  // window: with the note form open it is much bigger, so it is measured.
   function placeTools() {
     if (!tools.el || tools.host?.hidden) return;
     const r = tools.el.getBoundingClientRect();
-    const w = 90;
-    const left = Math.min(r.right + 10, innerWidth - w - 8);
-    const top = Math.max(8, Math.min(r.top - 2, innerHeight - 40));
-    tools.host.style.left = `${Math.max(8, left)}px`;
+    const { width: w, height: h } = tools.host.getBoundingClientRect();
+    const m = 8;
+    let left = r.right + 10;
+    let top = r.top - 2;
+    // No room on the right: below the change's last line, at its right edge.
+    if (left + w > innerWidth - m) {
+      left = r.right - w;
+      top = r.bottom + 6;
+    }
+    left = Math.max(m, Math.min(left, innerWidth - w - m));
+    top = Math.max(m, Math.min(top, innerHeight - h - m));
+    tools.host.style.left = `${left}px`;
     tools.host.style.top = `${top}px`;
   }
 

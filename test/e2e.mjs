@@ -290,6 +290,32 @@ try {
   await waitBadge(/change/);
   assert.equal(await tab.getAttribute("p[data-redline-changed]", "data-redline-review"), "ok", "reviews last");
 
+  // The note form stays inside a narrow window, and tooltips show at once.
+  await tab.setViewportSize({ width: 560, height: 700 });
+  await tab.hover("p[data-redline-new]");
+  await tab.waitForFunction(`!!document.querySelector("#redline-tools")`);
+  await tab.keyboard.press("c");
+  await tab.evaluate(`${toolsRoot}.querySelector(".suggest").click()`);
+  await tab.waitForTimeout(100);
+  const box = await tab.evaluate(() => {
+    const r = document.querySelector("#redline-tools").getBoundingClientRect();
+    return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, w: innerWidth, h: innerHeight };
+  });
+  console.log("note form:", JSON.stringify(box));
+  assert.ok(box.left >= 0 && box.right <= box.w && box.top >= 0 && box.bottom <= box.h, "the note form is on screen");
+  await tab.screenshot({ path: path.join(out, "note-narrow.png") });
+  await tab.keyboard.press("Escape");
+  const okBox = await tab.evaluate(() => {
+    const b = document.querySelector("#redline-tools").shadowRoot.querySelector(".ok").getBoundingClientRect();
+    return [b.x + b.width / 2, b.y + b.height / 2];
+  });
+  await tab.mouse.move(okBox[0], okBox[1]);
+  const tip = await tab.evaluate(() =>
+    getComputedStyle(document.querySelector("#redline-tools").shadowRoot.querySelector(".ok"), "::after").content
+  );
+  assert.match(tip, /Approve/);
+  await tab.setViewportSize({ width: 900, height: 900 });
+
   // "pages" lists which pages of the site differ, from the sitemap.
   const pagesList = async () => {
     for (let i = 0; i < 60; i++) {
