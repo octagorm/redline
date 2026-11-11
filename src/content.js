@@ -291,7 +291,7 @@ P       pages: which pages differ"><span>J↓</span><span>K↑</span><span>V</sp
     let note = "";
     if (res.ok) {
       const doc = new DOMParser().parseFromString(res.text, "text/html");
-      old = R.blocks(doc, opt).map((b) => b.text);
+      old = R.blocks(doc, opt);
       if (!old.length) note = " (the reference page has no text: is it drawn by scripts?)";
       if (res.url && new URL(res.url).pathname !== new URL(url).pathname)
         note += ` (redirected to ${res.url})`;

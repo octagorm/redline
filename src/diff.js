@@ -220,12 +220,27 @@ globalThis.Redline ??= (() => {
   // The reference's version of a block, shown only in "before". It takes the
   // tag and classes of the live block it stands next to, so it is styled the
   // same. `words` marks which of its words are gone.
-  function oldBlock(like, words, removed) {
-    const el = document.createElement(like.tagName);
-    el.className = like.className;
+  //
+  // A removed block has no live counterpart: it is built from the reference's
+  // own element (`ref`: { tag, className }), so a removed paragraph looks like
+  // a paragraph even when it is placed next to a heading.
+  const IN_LIST = new Set(["LI", "DT", "DD", "TD", "TH", "CAPTION", "SUMMARY"]);
+  function oldBlock(like, words, removed, ref) {
+    let tag = like.tagName;
+    let cls = like.className;
+    let css = like.style.cssText;
+    if (ref) {
+      tag = ref.tag;
+      cls = ref.className;
+      css = "";
+      // An item of a list or table only fits beside another of its kind.
+      if (IN_LIST.has(tag) && tag !== like.tagName) tag = "P";
+    }
+    const el = document.createElement(tag);
+    el.className = typeof cls === "string" ? cls : "";
     el.classList.add("redline-old");
     if (removed) el.classList.add("redline-removed");
-    el.style.cssText = like.style.cssText;
+    el.style.cssText = css;
     // Neighbouring gone words share one <del>, as new words share one <mark>.
     let del = null;
     for (const [i, w] of words.entries()) {
@@ -254,7 +269,13 @@ globalThis.Redline ??= (() => {
   // between the two server versions, and the live page is used only to find
   // each block on screen; so text drawn by scripts in the browser (a clock, a
   // date) never counts as a change. Without it, the live page is diffed as is.
-  function show(dom, old, own) {
+  function show(dom, oldBlocks, own) {
+    // The reference may be given as block texts, or as blocks() of its
+    // document, which also tells removed blocks what element they were.
+    const refs = oldBlocks.map((b) =>
+      typeof b === "string" ? null : { tag: b.el.tagName, className: b.el.getAttribute("class") ?? "" }
+    );
+    const old = oldBlocks.map((b) => (typeof b === "string" ? b : b.text));
     let at = (i) => dom[i];
     if (own) {
       const where = new Map(lcs(own, dom, (o, d) => o === d.text));
@@ -276,14 +297,16 @@ globalThis.Redline ??= (() => {
       for (const el of els) el.setAttribute("data-redline-id", id);
       changes.push({ id, kind, before, after });
     };
-    const removed = (text, before) => {
+    const removed = (o, before) => {
+      const text = old[o];
       const next = anchorFrom(before);
       const like = next ?? dom[dom.length - 1];
       if (!like) return;
       const el = oldBlock(
         like.el,
         text.split(" ").map((w) => ({ text: w, gone: true })),
-        true
+        true,
+        refs[o]
       );
       if (next) next.el.before(el);
       else like.el.after(el);
@@ -316,7 +339,7 @@ globalThis.Redline ??= (() => {
           continue;
         }
         // Old blocks skipped on the way to the match were removed.
-        for (let o = nextOld; o < match; o++) removed(old[o], i);
+        for (let o = nextOld; o < match; o++) removed(o, i);
         nextOld = match + 1;
         if (!b) continue;
         const was = old[match].split(" ");
@@ -346,7 +369,7 @@ globalThis.Redline ??= (() => {
         }
         markUp(b.el, b.toks, fresh, gaps);
       }
-      for (let o = nextOld; o < kj; o++) removed(old[o], ki);
+      for (let o = nextOld; o < kj; o++) removed(o, ki);
       i = ki + 1;
       j = kj + 1;
     }

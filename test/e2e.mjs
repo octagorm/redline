@@ -30,7 +30,7 @@ ${body}
   document.getElementById("about").onclick = (e) => {
     e.preventDefault();
     history.pushState({}, "", "/about");
-    document.querySelector("main").innerHTML = "<h1>About</h1><p>We make clocks that show the sky.</p>";
+    document.querySelector("main").innerHTML = "<h1>About</h1><p>We make clocks that show the sky.</p><h2>Makers</h2>";
   };
 </script>
 </body></html>`;
@@ -43,7 +43,8 @@ const reference = {
 <p>Unchanged text stays as it is<sup>1</sup>.</p>
 <ul><li>First item</li><li>Second item</li></ul>
 </main>`),
-  "/about": page(`<main><h1>About</h1><p>We make clocks.</p></main>`),
+  // A paragraph removed just before a heading must still look like one.
+  "/about": page(`<main><h1>About</h1><p>We make clocks.</p><p class="lead">We also repair them.</p><h2>Makers</h2></main>`),
   "/gone": page(`<main><h1>Gone</h1><p>Only on the reference.</p></main>`),
 };
 const dev = {
@@ -55,7 +56,7 @@ const dev = {
 <ul><li>First item</li><li>Second item</li></ul>
 </main>`),
   // What the client-side navigation below draws, as the server would send it.
-  "/about": page(`<main><h1>About</h1><p>We make clocks that show the sky.</p></main>`),
+  "/about": page(`<main><h1>About</h1><p>We make clocks that show the sky.</p><h2>Makers</h2></main>`),
   "/fresh": page(`<main><h1>Fresh page</h1><p>Only on dev.</p></main>`),
   // Sitemaps often name the production address even on a preview.
   "/sitemap.xml": `<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${["/", "/about", "/fresh", "/gone"]
@@ -235,10 +236,15 @@ try {
 
   // It stays on across navigation, and follows client-side navigation.
   await tab.click("#about");
-  console.log("after client-side nav:", await waitBadge(/^1 change\b/));
+  console.log("after client-side nav:", await waitBadge(/^2 changes\b/));
   assert.deepEqual(
     await tab.$$eval("mark.redline-new", (m) => m.map((x) => x.textContent)),
     ["clocks that show the sky."]
+  );
+  assert.deepEqual(
+    await tab.$eval(".redline-removed", (e) => [e.tagName, e.classList.contains("lead"), e.textContent]),
+    ["P", true, "We also repair them."],
+    "a removed paragraph is a paragraph, not the heading it sits beside"
   );
 
   // A page the reference does not have is new from top to bottom.
@@ -346,7 +352,7 @@ try {
   const listed = await pagesList();
   console.log("pages:", listed);
   await tab.screenshot({ path: path.join(out, "pages.png") });
-  assert.deepEqual(listed, ["/ 1 to review · 1 ✓ 1 ✗ 1 ✎", "/about 1 to review", "/fresh new page", "/gone removed page"]);
+  assert.deepEqual(listed, ["/ 1 to review · 1 ✓ 1 ✗ 1 ✎", "/about 2 to review", "/fresh new page", "/gone removed page"]);
   // Reviewing the last change updates the open list at once.
   await tab.hover(".redline-removed");
   await tab.keyboard.press("a");
