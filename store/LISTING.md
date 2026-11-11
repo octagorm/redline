@@ -24,6 +24,7 @@ Pair the site you are working on (say http://localhost:3000) with the site to co
 • New words are highlighted, and removed words are struck through right where they were.
 • Press B to switch views: all changes, only what was added, or only what was removed.
 • Press J and K to jump to the next and previous change.
+• "pages" lists every page of the site that differs, including new and removed pages.
 • The badge counts the changed blocks.
 
 It stays on in the tab as you click around, including in single-page apps.

@@ -44,6 +44,7 @@ const reference = {
 <ul><li>First item</li><li>Second item</li></ul>
 </main>`),
   "/about": page(`<main><h1>About</h1><p>We make clocks.</p></main>`),
+  "/gone": page(`<main><h1>Gone</h1><p>Only on the reference.</p></main>`),
 };
 const dev = {
   "/": page(`<main>
@@ -56,6 +57,10 @@ const dev = {
   // What the client-side navigation below draws, as the server would send it.
   "/about": page(`<main><h1>About</h1><p>We make clocks that show the sky.</p></main>`),
   "/fresh": page(`<main><h1>Fresh page</h1><p>Only on dev.</p></main>`),
+  // Sitemaps often name the production address even on a preview.
+  "/sitemap.xml": `<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${["/", "/about", "/fresh", "/gone"]
+    .map((p) => `<url><loc>https://example.com${p}</loc></url>`)
+    .join("")}</urlset>`,
 };
 
 function serve(pages, port, needCookie) {
@@ -217,6 +222,29 @@ try {
   console.log("404 page:", await waitBadge(/change/));
   assert.equal(await tab.$$eval("[data-redline-new]", (e) => e.length), 2);
 
+  // "pages" lists which pages of the site differ, from the sitemap.
+  const pagesList = async () => {
+    for (let i = 0; i < 60; i++) {
+      const t = await tab.evaluate(() => document.querySelector("#redline-host").shadowRoot.querySelector(".ptitle").textContent);
+      if (/differ/.test(t)) break;
+      await tab.waitForTimeout(100);
+    }
+    return tab.evaluate(() =>
+      [...document.querySelector("#redline-host").shadowRoot.querySelectorAll(".panel li")].map(
+        (li) => li.innerText.replace(/\s+/g, " ")
+      )
+    );
+  };
+  await tab.goto(DEV + "/");
+  await waitBadge(/change/);
+  await tab.evaluate(() =>
+    document.querySelector("#redline-host").shadowRoot.querySelector(".pages").click()
+  );
+  const listed = await pagesList();
+  console.log("pages:", listed);
+  await tab.screenshot({ path: path.join(out, "pages.png") });
+  assert.deepEqual(listed, ["/ 3 changes", "/about 1 change", "/fresh new page", "/gone removed page"]);
+
   // hide turns it off and puts the page back.
   await tab.goto(DEV + "/");
   await waitBadge(/change/);
@@ -256,6 +284,13 @@ try {
     await tab.$$eval("mark.redline-new", (m) => m.map((x) => x.textContent)),
     ["whole", "redrawn"]
   );
+  // No sitemap here: it follows links, but stays inside the preview's folder.
+  await tab.evaluate(() =>
+    document.querySelector("#redline-host").shadowRoot.querySelector(".pages").click()
+  );
+  const crawled = await pagesList();
+  console.log("crawled pages:", crawled);
+  assert.deepEqual(crawled, ["/ 3 changes"]);
   console.log("\nall checks passed; screenshots in test/out/");
 } catch (e) {
   failed = true;

@@ -76,7 +76,27 @@
            text-decoration:underline; cursor:pointer; }
   .keys { opacity:.7; }
   [hidden] { display:none; }
+  .wrap { display:flex; flex-direction:column; align-items:flex-end; gap:8px; }
+  .panel { max-height:50vh; overflow:auto; min-width:260px; max-width:min(440px, 90vw);
+           padding:10px 12px; border-radius:8px; background:#1c1a17; color:#f3efe6;
+           font:12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+           box-shadow:0 2px 10px rgba(0,0,0,.25); }
+  .panel ul { list-style:none; margin:6px 0 0; padding:0; }
+  .panel li { display:flex; gap:10px; justify-content:space-between; }
+  .panel a { color:#f3efe6; text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .panel a:hover { text-decoration:underline; }
+  .panel li.here a { color:#e0aa3e; }
+  .panel .n { opacity:.7; white-space:nowrap; }
+  .panel .new { color:#e0aa3e; }
+  .panel .removed { color:#ff8a80; }
+  .panel .head { display:flex; justify-content:space-between; gap:12px; }
+  .panel button { opacity:.8; }
 </style>
+<div class="wrap">
+<div class="panel" hidden>
+  <div class="head"><span class="ptitle"></span><button class="rescan">scan again</button></div>
+  <ul></ul>
+</div>
 <div class="b">
   <span class="msg"></span>
   <button class="count" hidden></button>
@@ -86,8 +106,10 @@
     <button data-mode="added" title="Only what is new">added</button>
     <button data-mode="removed" title="The other site's wording, removed words struck through">removed</button>
   </span>
+  <button class="pages" title="Which pages of the site differ">pages</button>
   <button class="again" title="Compare again">again</button>
   <button class="off" title="Turn Redline off for this tab">hide</button>
+</div>
 </div>`;
     const $ = (s) => root.querySelector(s);
     ui = {
@@ -98,7 +120,14 @@
       modes: $(".modes"),
       again: $(".again"),
       off: $(".off"),
+      pages: $(".pages"),
+      panel: $(".panel"),
+      ptitle: $(".ptitle"),
+      plist: $(".panel ul"),
+      rescan: $(".rescan"),
     };
+    ui.pages.onclick = () => togglePages();
+    ui.rescan.onclick = () => scanPages();
     ui.count.onclick = () => step(1, true);
     for (const b of root.querySelectorAll("[data-mode]"))
       b.onclick = () => setMode(b.dataset.mode);
@@ -195,11 +224,8 @@
     const [res, mine] = await Promise.all([get(url), get(location.href)]);
     if (id !== runId || !state.on) return;
 
-    let opt = { ignore: pair.ignore?.trim() || "", blocks: pair.blocks?.trim() || "" };
-    try {
-      if (opt.ignore) document.querySelector(opt.ignore);
-      if (opt.blocks) document.querySelector(opt.blocks);
-    } catch {
+    const opt = options();
+    if (!opt) {
       render("a selector in this site's settings is not valid CSS");
       return;
     }
@@ -242,6 +268,102 @@
       state.count === 0 ? `same as ${new URL(base).host}${note}` : "",
       `Compared with ${url}${note}`
     );
+  }
+
+  // The pair's ignore and block selectors, or null when one is not valid CSS.
+  function options() {
+    const opt = { ignore: pair?.ignore?.trim() || "", blocks: pair?.blocks?.trim() || "" };
+    try {
+      if (opt.ignore) document.querySelector(opt.ignore);
+      if (opt.blocks) document.querySelector(opt.blocks);
+    } catch {
+      return null;
+    }
+    return opt;
+  }
+
+  // ---------- the "pages" panel: which pages of the site differ ----------
+
+  // Results last for the tab, so the list survives moving between pages.
+  const PAGES_KEY = "redline-pages";
+  const scanKey = () => pair && `${pair.from} -> ${pair.to}`;
+  let scanning = false;
+
+  function savedScan() {
+    try {
+      const s = JSON.parse(sessionStorage.getItem(PAGES_KEY));
+      return s?.key === scanKey() ? s : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function togglePages() {
+    const u = badge();
+    if (!u.panel.hidden) {
+      u.panel.hidden = true;
+      return;
+    }
+    u.panel.hidden = false;
+    const s = savedScan();
+    if (s) listPages(s.items, s.at);
+    else scanPages();
+  }
+
+  async function scanPages() {
+    if (scanning || !pair) return;
+    const opt = options();
+    if (!opt) return;
+    scanning = true;
+    const u = badge();
+    u.panel.hidden = false;
+    u.plist.textContent = "";
+    u.rescan.hidden = true;
+    u.ptitle.textContent = "finding pages…";
+    try {
+      const items = await globalThis.RedlineScan.scan(pair, opt, (done, total) => {
+        u.ptitle.textContent = total ? `comparing ${done} of ${total} pages…` : "finding pages…";
+      });
+      const at = Date.now();
+      try {
+        sessionStorage.setItem(PAGES_KEY, JSON.stringify({ key: scanKey(), at, items }));
+      } catch {}
+      listPages(items, at);
+    } catch (e) {
+      u.ptitle.textContent = `could not scan: ${e}`;
+    } finally {
+      scanning = false;
+      u.rescan.hidden = false;
+    }
+  }
+
+  function listPages(items, at) {
+    const u = badge();
+    const mins = Math.round((Date.now() - at) / 60000);
+    const when = mins < 1 ? "just now" : `${mins} min ago`;
+    u.ptitle.textContent = items.length
+      ? `${items.length} ${items.length === 1 ? "page differs" : "pages differ"} (${when})`
+      : `no pages differ (${when})`;
+    u.plist.textContent = "";
+    for (const it of items) {
+      const li = document.createElement("li");
+      if (new URL(it.url).pathname === location.pathname) li.className = "here";
+      const a = document.createElement("a");
+      a.href = it.url;
+      a.textContent = it.path;
+      a.title = it.url;
+      if (it.state === "removed") {
+        // Not on this site any more: open the reference's copy.
+        a.href = globalThis.RedlinePairs.normalise(pair.to) + it.path;
+      }
+      const n = document.createElement("span");
+      n.className = "n";
+      if (it.state === "new") n.innerHTML = '<span class="new">new page</span>';
+      else if (it.state === "removed") n.innerHTML = '<span class="removed">removed page</span>';
+      else n.textContent = `${it.count} ${it.count === 1 ? "change" : "changes"}`;
+      li.append(a, n);
+      u.plist.append(li);
+    }
   }
 
   // Switching modes shows and hides blocks, which would move the

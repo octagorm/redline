@@ -348,6 +348,32 @@ globalThis.Redline ??= (() => {
     return count;
   }
 
+  // How many blocks show() would mark, from the texts alone: for listing the
+  // changed pages of a site without opening them.
+  function count(own, old) {
+    const kept = lcs(own, old, (a, b) => a === b);
+    kept.push([own.length, old.length]);
+    let n = 0;
+    let i = 0;
+    let j = 0;
+    for (const [ki, kj] of kept) {
+      let nextOld = j;
+      for (; i < ki; i++) {
+        n++;
+        for (let o = nextOld; o < kj; o++)
+          if (similarity(own[i], old[o]) >= 0.4) {
+            n += o - nextOld; // removed on the way to the rewrite
+            nextOld = o + 1;
+            break;
+          }
+      }
+      n += kj - nextOld;
+      i = ki + 1;
+      j = kj + 1;
+    }
+    return n;
+  }
+
   // Undoes show(). The text nodes it split stay split, which reads the same.
   function clear(doc = document) {
     doc.querySelectorAll(".redline-old, .redline-gone").forEach((e) => e.remove());
@@ -416,5 +442,5 @@ html.redline-added .redline-old.redline-removed {
   box-shadow: none !important;
 }`;
 
-  return { DEFAULT_BLOCKS, tokens, blocks, lcs, similarity, show, clear, CSS };
+  return { DEFAULT_BLOCKS, tokens, blocks, lcs, similarity, show, count, clear, CSS };
 })();

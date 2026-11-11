@@ -16,6 +16,16 @@ The badge in the corner counts the changed blocks and switches views too.
 
 ![The "removed" view: the other site's wording, removed words struck through](docs/removed.png)
 
+**pages** in the badge lists every page of the site that differs, with its
+number of changes, and pages that are new or were removed. Click one to open
+it with Redline on. It finds the pages from the site's `sitemap.xml` (and the
+other site's, to catch removed pages), or, without one, by following links
+from the page you are on. It fetches each page from both sites, so it runs
+only when you ask, and stops at 200 pages. The list stays for the tab until
+you scan again.
+
+![The pages list: which pages differ, and how much](docs/pages.png)
+
 ## Install
 
 Not in the Chrome Web Store yet. To load it from this folder:
