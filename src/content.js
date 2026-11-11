@@ -78,6 +78,8 @@
   button { background:none; border:0; padding:0; color:inherit; font:inherit;
            text-decoration:underline; cursor:pointer; }
   .keys { opacity:.7; cursor:help; }
+  .todo { font-weight:700; }
+  .todo.done { font-weight:400; text-decoration:none; cursor:default; }
   /* Quick tooltips: the browser's own take a second to appear. */
   [data-tip] { position:relative; }
   [data-tip]:hover::after { content:attr(data-tip); position:absolute; right:0;
@@ -116,6 +118,7 @@
 <div class="b">
   <span class="msg"></span>
   <button class="count" hidden data-tip="Changes on this page. Click to go to the first"></button>
+  <button class="todo" hidden data-tip="Changes with no reaction yet. Click to go to the next one"></button>
   <span class="reviewed" hidden data-tip="Of this page's changes: ✓ approved, ✗ rejected, ✎ with a note or wording"></span>
   <span class="keys" hidden data-tip="J / K   next or previous change
 B       next view: all, added, removed
@@ -145,6 +148,7 @@ C       add a note or wording">J K B A X C</span>
       pages: $(".pages"),
       notes: $(".notes"),
       reviewed: $(".reviewed"),
+      todo: $(".todo"),
       panel: $(".panel"),
       ptitle: $(".ptitle"),
       plist: $(".panel ul"),
@@ -157,6 +161,7 @@ C       add a note or wording">J K B A X C</span>
     ui.more.onclick = () => scanPages(false);
     ui.pages.onclick = () => togglePages();
     ui.notes.onclick = () => copyNotes();
+    ui.todo.onclick = () => nextOpen();
     ui.rescan.onclick = () => scanPages(true);
     ui.count.onclick = () => step(1, true);
     for (const b of root.querySelectorAll("[data-mode]"))
@@ -182,6 +187,12 @@ C       add a note or wording">J K B A X C</span>
     const t = RV()?.tally(sum) ?? "";
     u.reviewed.hidden = !t;
     u.reviewed.textContent = t;
+    // Changes nobody has reacted to yet, or a tick once there are none.
+    u.todo.hidden = !sum;
+    if (sum) {
+      u.todo.textContent = sum.open ? `${sum.open} to review` : "all reviewed";
+      u.todo.classList.toggle("done", !sum.open);
+    }
     const fb = reviews ? RV().feedback(reviews).length : 0;
     u.notes.hidden = !fb;
     if (fb) u.notes.textContent = `copy notes (${fb})`;
@@ -355,6 +366,23 @@ C       add a note or wording">J K B A X C</span>
     render(ui?.msg.textContent, ui?.box.title);
     // The pages list shows each page's progress, so it follows along.
     if (ui && !ui.panel.hidden && !signal && scan) listPages();
+  }
+
+  // Goes to the next change with no reaction yet, after the current one.
+  function nextOpen() {
+    const open = [...document.querySelectorAll("[data-redline-id]")].filter(
+      (el) => el.getClientRects().length && !RV().reacted(reviews, el.getAttribute("data-redline-id"))
+    );
+    if (!open.length) return;
+    const from = tools.el ?? state.current;
+    const after = from
+      ? open.find((el) => from.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING)
+      : null;
+    const target = after ?? open[0];
+    state.current = target;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    const change = changeOf(target);
+    if (change) showTools(change);
   }
 
   async function copyNotes() {
@@ -695,7 +723,8 @@ C       add a note or wording">J K B A X C</span>
       if (it.state === "new") tag.innerHTML = '<span class="new">new page</span>';
       else if (it.state === "removed") tag.innerHTML = '<span class="removed">removed page</span>';
       else {
-        tag.textContent = `${it.count} ${it.count === 1 ? "change" : "changes"}`;
+        // Not opened since its text last changed: none of it is reviewed.
+        tag.textContent = `${it.count} to review`;
         // Review progress, for pages opened since their text last changed.
         const sum = reviews && RV().pageSummary(reviews, it.path);
         const t = RV().tally(sum);
@@ -703,7 +732,7 @@ C       add a note or wording">J K B A X C</span>
           tag.textContent =
             sum.ok === sum.total && !sum.noted
               ? "all approved"
-              : `${it.count} ${it.count === 1 ? "change" : "changes"}: ${t}`;
+              : [sum.open && `${sum.open} to review`, t].filter(Boolean).join(" · ");
       }
       li.append(a, tag);
       u.plist.append(li);
@@ -825,7 +854,7 @@ C       add a note or wording">J K B A X C</span>
         const s = key === "a" ? "ok" : "no";
         const was = reviews?.entries[tools.change.id]?.state;
         review(tools.change, { state: was === s ? null : s }).then(() => {
-          if (was !== s) step(1);
+          if (was !== s) nextOpen();
         });
       } else if (key === "c" && tools.change) openNote();
       else if (key === "j") step(1);

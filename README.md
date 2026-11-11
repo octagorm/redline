@@ -21,8 +21,10 @@ The badge in the corner counts the changed blocks and switches views too.
 Point at a change (or go to it with <kbd>J</kbd>/<kbd>K</kbd>) and a small
 toolbar appears beside it: **✓** approves it (<kbd>A</kbd>), **✗** rejects it
 (<kbd>X</kbd>), and **✎** (<kbd>C</kbd>) adds a note or suggested wording.
-<kbd>A</kbd> and <kbd>X</kbd> move on to the next change. Approved changes turn
-green, rejected ones get a red ring, and the badge counts both.
+<kbd>A</kbd> and <kbd>X</kbd> move on to the next change still to review.
+Approved changes turn green, rejected ones get a red ring, and the badge
+counts them, with **N to review** for the changes nobody has reacted to yet;
+click it to go to the next one.
 
 **copy notes** puts every rejection, note and suggested wording on the
 clipboard as a Markdown list, page by page, quoting the text and what it was

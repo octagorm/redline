@@ -257,6 +257,14 @@ try {
   await tab.hover("p[data-redline-new]");
   await tab.keyboard.press("x");
   await tab.waitForFunction(`document.querySelector("p[data-redline-new]").getAttribute("data-redline-review") === "no"`);
+  // X moved the toolbar on to the change still to review, the removed paragraph.
+  await tab.waitForTimeout(200);
+  assert.equal(
+    await tab.evaluate(() => document.querySelector("#redline-tools") && getComputedStyle(document.querySelector(".redline-removed")).display !== "none"),
+    true
+  );
+  await tab.mouse.move(5, 5);
+  await tab.hover("p[data-redline-new]");
   await tab.keyboard.press("c");
   await tab.waitForTimeout(100);
   await tab.keyboard.type("Too vague; name a maker.");
@@ -265,6 +273,7 @@ try {
   await tab.evaluate(`${toolsRoot}.querySelector("form").requestSubmit()`);
   await tab.waitForFunction(`document.querySelector("p[data-redline-new]").hasAttribute("data-redline-noted")`);
   console.log("reviewed:", await badge());
+  assert.match(await badge(), /1 to review/);
   assert.match(await badge(), /1 ✓ 1 ✗ 1 ✎/);
   assert.match(await badge(), /copy notes \(1\)/);
   await tab.screenshot({ path: path.join(out, "review.png") });
@@ -337,7 +346,7 @@ try {
   const listed = await pagesList();
   console.log("pages:", listed);
   await tab.screenshot({ path: path.join(out, "pages.png") });
-  assert.deepEqual(listed, ["/ 3 changes: 1 ✓ 1 ✗ 1 ✎", "/about 1 change", "/fresh new page", "/gone removed page"]);
+  assert.deepEqual(listed, ["/ 1 to review · 1 ✓ 1 ✗ 1 ✎", "/about 1 to review", "/fresh new page", "/gone removed page"]);
 
   // A huge site: checks a batch at a time, nearest first, and says how much
   // it has checked.
@@ -356,7 +365,7 @@ try {
   const note = await tab.evaluate(`${shadow(".pnote")}.textContent`);
   console.log("big site:", await tab.evaluate(`${shadow(".ptitle")}.textContent`), "|", note, "|", await tab.evaluate(`${shadow(".more")}.textContent`), `| ${Date.now() - started} ms`);
   assert.match(note, /^checked 100 of 6,000\+? pages, nearest this one first/);
-  assert.deepEqual(await pagesList(), ["/p/5 1 change"], "the current page is checked first");
+  assert.deepEqual(await pagesList(), ["/p/5 1 to review"], "the current page is checked first");
   await tab.evaluate(`${shadow(".more")}.click()`);
   await tab.waitForFunction(`${shadow(".pnote")}.textContent.startsWith("checked 200")`, null, { timeout: 30000 });
   // Stop halfway through a batch keeps what was compared.
@@ -413,7 +422,7 @@ try {
   );
   const crawled = await pagesList();
   console.log("crawled pages:", crawled);
-  assert.deepEqual(crawled, ["/ 3 changes"]);
+  assert.deepEqual(crawled, ["/ 3 to review"]);
   console.log("\nall checks passed; screenshots in test/out/");
 } catch (e) {
   failed = true;
