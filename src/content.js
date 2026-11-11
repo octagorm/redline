@@ -328,6 +328,7 @@ P       pages: which pages differ"><span>J↓</span><span>K↑</span><span>V</sp
       reviews = null;
     }
     applyReviews();
+    syncScan();
     render(
       state.count === 0 ? `same as ${new URL(base).host}${note}` : "",
       `Compared with ${url}${note}`
@@ -689,6 +690,25 @@ P       pages: which pages differ"><span>J↓</span><span>K↑</span><span>V</sp
     listPages();
   }
 
+  // Brings this page's row in the pages list up to date with what was just
+  // compared, so the list never lags behind the page you are on.
+  function syncScan() {
+    if (!loadScan() || signal) return;
+    const path = rest();
+    const items = scan.items.filter((it) => it.path !== path || it.state === "removed");
+    const old = scan.items.find((it) => it.path === path);
+    if (state.count)
+      items.push({
+        path,
+        url: location.origin + location.pathname,
+        count: state.count,
+        state: old?.state === "new" ? "new" : "changed",
+      });
+    scan.items = items.sort((a, b) => a.path.localeCompare(b.path));
+    saveScan();
+    if (ui && !ui.panel.hidden) listPages();
+  }
+
   function listPages(running = false) {
     const u = badge();
     u.stop.hidden = !running;
@@ -733,9 +753,13 @@ P       pages: which pages differ"><span>J↓</span><span>K↑</span><span>V</sp
         // Not opened since its text last changed: none of it is reviewed.
         tag.textContent = `${it.count} to review`;
         // Review progress, for pages opened since their text last changed.
+        // The page's own record wins when it is newer than the scan: the
+        // scan's count can be stale, or count text the page cannot show.
         const sum = reviews && RV().pageSummary(reviews, it.path);
+        const fresh = sum && (sum.total === it.count || (reviews.pages[it.path]?.at ?? 0) >= scan.at);
         const t = RV().tally(sum);
-        if (sum && sum.total === it.count && t)
+        if (fresh && !sum.open && !t) tag.textContent = "no changes";
+        else if (fresh && t)
           tag.textContent =
             sum.ok === sum.total && !sum.noted
               ? "all approved"

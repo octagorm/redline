@@ -347,6 +347,14 @@ try {
   console.log("pages:", listed);
   await tab.screenshot({ path: path.join(out, "pages.png") });
   assert.deepEqual(listed, ["/ 1 to review · 1 ✓ 1 ✗ 1 ✎", "/about 1 to review", "/fresh new page", "/gone removed page"]);
+  // Reviewing the last change updates the open list at once.
+  await tab.hover(".redline-removed");
+  await tab.keyboard.press("a");
+  await tab.waitForFunction(() =>
+    [...document.querySelector("#redline-host").shadowRoot.querySelectorAll(".panel li")].some((li) =>
+      /^\/\s+2 ✓ 1 ✗ 1 ✎$/.test(li.innerText.replace(/\s+/g, " ").replace(/^\/ /, "/ "))
+    )
+  );
 
   // A huge site: checks a batch at a time, nearest first, and says how much
   // it has checked.
