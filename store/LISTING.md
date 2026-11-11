@@ -22,7 +22,7 @@ Redline shows what you changed on a website while you read it.
 Pair the site you are working on (say http://localhost:3000) with the site to compare it with (say your live site, or a second local server running the main branch). Then turn Redline on in a tab with the toolbar button, Alt+Shift+R, or ?redline in the address:
 
 • New words are highlighted, and removed words are struck through right where they were.
-• Press B to switch views: all changes, only what was added, or only what was removed.
+• Press V to switch views: all changes, only what was added, or only what was removed.
 • Press J and K to jump to the next and previous change.
 • "pages" lists every page of the site that differs, including new and removed pages.
 • Review as you go: approve (A) or reject (X) each change, add notes or suggested wording (C), and copy them all as a list for whoever makes the fixes.

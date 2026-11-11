@@ -127,15 +127,15 @@
   <button class="todo" hidden data-tip="Changes with no reaction yet. Click to go to the next one"></button>
   <span class="reviewed" hidden data-tip="Of this page's changes: ✓ approved, ✗ rejected, ✎ with a note or wording"></span>
   <span class="keys" hidden data-tip="J / K   next or previous change
-B       next view: all, added, removed
+V       next view: all, added, removed
 A       approve the change
 X       reject it
 C       add a note or wording
-P       pages: which pages differ"><span>J↓</span><span>K↑</span><span>B</span><span class="k-ok">A</span><span class="k-no">X</span><span>C</span><span>P</span></span>
+P       pages: which pages differ"><span>J↓</span><span>K↑</span><span>V</span><span class="k-ok">A</span><span class="k-no">X</span><span>C</span><span>P</span></span>
   <span class="modes" hidden>
-    <button data-mode="all" data-tip="New words highlighted, removed ones struck through (B)">all</button>
-    <button data-mode="added" data-tip="Only what is new (B)">added</button>
-    <button data-mode="removed" data-tip="The other site's wording, removed words struck through (B)">removed</button>
+    <button data-mode="all" data-tip="New words highlighted, removed ones struck through (V)">all</button>
+    <button data-mode="added" data-tip="Only what is new (V)">added</button>
+    <button data-mode="removed" data-tip="The other site's wording, removed words struck through (V)">removed</button>
   </span>
   <button class="pages" data-tip="Which pages of the site differ   P">pages</button>
   <button class="notes" hidden data-tip="Copy your rejections, notes and suggested wording as a list">copy notes</button>
@@ -856,7 +856,7 @@ P       pages: which pages differ"><span>J↓</span><span>K↑</span><span>B</sp
       const key = e.key.toLowerCase();
       if (key === "p") togglePages();
       else if (!state.count) return;
-      else if (key === "b")
+      else if (key === "v")
         setMode(MODES[(MODES.indexOf(state.mode) + 1) % MODES.length]);
       else if ((key === "a" || key === "x") && tools.change) {
         // Approve or reject, then on to the next change.

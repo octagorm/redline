@@ -8,7 +8,7 @@ right where they were.
 
 ![New words highlighted, removed words struck through beside them, a removed paragraph shown struck through](docs/all.png)
 
-Press <kbd>B</kbd> to switch between three views: **all** (the default, as
+Press <kbd>V</kbd> to switch between three views: **all** (the default, as
 above), **added** (only what is new, with a removed paragraph shown as a
 dashed line) and **removed** (the other site's wording, removed words struck
 through). <kbd>J</kbd> and <kbd>K</kbd> go to the next and previous change.

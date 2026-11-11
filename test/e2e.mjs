@@ -200,7 +200,7 @@ try {
   await tab.screenshot({ path: path.join(out, "all.png") });
 
   // B: "added", only what is new; the removed paragraph is a dashed line.
-  await tab.keyboard.press("b");
+  await tab.keyboard.press("v");
   assert.deepEqual(await visibleText(".redline-gone del"), []);
   assert.equal(
     await changed(),
@@ -213,7 +213,7 @@ try {
   await tab.screenshot({ path: path.join(out, "added.png") });
 
   // B: "removed", the reference's wording with removed words struck through.
-  await tab.keyboard.press("b");
+  await tab.keyboard.press("v");
   const struck = await visibleText(".redline-old del");
   assert.ok(struck.includes("drawn"), "the old word is struck through");
   assert.ok(await tab.isVisible("text=This paragraph is going away"));
@@ -221,8 +221,8 @@ try {
   await tab.screenshot({ path: path.join(out, "removed.png") });
 
   // B again: back to "all", and the mode sticks across page loads.
-  await tab.keyboard.press("b");
-  await tab.keyboard.press("b");
+  await tab.keyboard.press("v");
+  await tab.keyboard.press("v");
   await tab.reload();
   await waitBadge(/change/);
   assert.equal(
@@ -230,8 +230,8 @@ try {
     true,
     "mode remembered"
   );
-  await tab.keyboard.press("b");
-  await tab.keyboard.press("b");
+  await tab.keyboard.press("v");
+  await tab.keyboard.press("v");
 
   // It stays on across navigation, and follows client-side navigation.
   await tab.click("#about");
