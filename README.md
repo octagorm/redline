@@ -29,7 +29,8 @@ It should work the same in other Chromium browsers (Brave, Arc, Edge).
 1. On a page of the site you are working on, click the Redline button (or
    press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>). The first time, it
    opens the settings with this site filled in.
-2. Fill in **Compare with**, for example `https://example.com`, and save.
+2. Fill in **Compare with**, for example `example.com` (https is assumed, or
+   http for local addresses), and save.
    Chrome asks for access to both sites.
 3. Click the button again, or add `?redline` to the address. Redline stays on
    in that tab as you navigate, including client-side navigation, until you

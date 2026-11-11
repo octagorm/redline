@@ -27,9 +27,24 @@ const matchFor = (url) => {
   return `${u.protocol}//${u.hostname}/*`;
 };
 
+// "example.com" means https://example.com; a local address means http.
+function withScheme(text) {
+  if (!text || /^[a-z][a-z0-9+.-]*:\/\//i.test(text)) return text;
+  const host = text.split(/[/:?#]/)[0].toLowerCase();
+  const local =
+    host === "localhost" ||
+    host.endsWith(".localhost") ||
+    host.endsWith(".test") ||
+    host.endsWith(".local") ||
+    /^(127\.|10\.|192\.168\.|\[::1\])/.test(host) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(host);
+  return (local ? "http://" : "https://") + text;
+}
+
 function check(pairs) {
   for (const p of pairs) {
     for (const f of ["from", "to"]) {
+      p[f] = withScheme(p[f]);
       try {
         const u = new URL(p[f]);
         if (!/^https?:$/.test(u.protocol)) throw 0;
@@ -60,6 +75,9 @@ document.getElementById("save").onclick = async () => {
     status.textContent = problem;
     return;
   }
+  // Show the addresses as saved, scheme and all.
+  list.querySelectorAll(".pair").forEach((node) => node.remove());
+  pairs.forEach((p) => addPair(p));
   const origins = [
     ...new Set(pairs.flatMap((p) => [matchFor(p.from), matchFor(p.to)])),
   ];
