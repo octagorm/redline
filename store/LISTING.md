@@ -28,6 +28,8 @@ Pair the site you are working on (say http://localhost:3000) with the site to co
 
 It stays on in the tab as you click around, including in single-page apps.
 
+Sites can set it up for their visitors: a preview build with <meta name="redline" content="https://your-production-site"> needs no settings at all, just a click on the button.
+
 Redline compares the text both servers send, so a clock or a "3 minutes ago" drawn in the browser never shows up as a change. Sites behind a login work as long as you are signed in to them. Each pair can ignore parts of the page (menus, footers, footnote numbers) with a CSS selector.
 
 Redline has no servers, analytics or accounts. It only talks to the sites you pair, and only asks for access to those. Open source: https://github.com/octagorm/redline
