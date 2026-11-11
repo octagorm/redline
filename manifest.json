@@ -2,10 +2,19 @@
   "manifest_version": 3,
   "name": "Redline",
   "version": "0.1.0",
-  "description": "Highlights, word by word, how the page you are on differs from the same page on another site, such as your dev server against production.",
-  "permissions": ["storage", "scripting", "activeTab"],
-  "optional_host_permissions": ["http://*/*", "https://*/*"],
-  "background": { "service_worker": "src/background.js" },
+  "description": "Highlights, word by word, how a page differs from the same page on another site, such as your dev server against production.",
+  "permissions": [
+    "storage",
+    "scripting",
+    "activeTab"
+  ],
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
   "action": {
     "default_title": "Redline: compare this page",
     "default_icon": {
@@ -23,9 +32,14 @@
   },
   "commands": {
     "_execute_action": {
-      "suggested_key": { "default": "Alt+Shift+R" },
+      "suggested_key": {
+        "default": "Alt+Shift+R"
+      },
       "description": "Turn Redline on or off for this tab"
     }
   },
-  "options_ui": { "page": "src/options.html", "open_in_tab": true }
+  "options_ui": {
+    "page": "src/options.html",
+    "open_in_tab": true
+  }
 }

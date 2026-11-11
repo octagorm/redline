@@ -12,11 +12,11 @@ import path from "node:path";
 import assert from "node:assert/strict";
 
 const root = path.resolve(import.meta.dirname, "..");
-const out = path.join(root, "test", "out");
+const out = path.join(root, process.env.STORE ? "store" : "test/out");
 fs.mkdirSync(out, { recursive: true });
 
 const page = (body, clock = "12:00:00") => `<!doctype html><html><head>
-<style>body{font:16px/1.6 Georgia,serif;max-width:640px;margin:40px auto;padding:0 16px;background:#faf8f3;color:#222}</style>
+<style>body{font:16px/1.6 Georgia,serif;max-width:640px;margin:40px auto;padding:0 16px;background:#faf8f3;color:#222}${process.env.STORE ? "html{zoom:1.6}" : ""}</style>
 </head><body>
 <nav><a href="/">Home</a> <a href="/about" id="about">About</a></nav>
 <p class="clock">It is <span id="clock">${clock}</span>.</p>
@@ -37,7 +37,7 @@ ${body}
 
 const reference = {
   "/": page(`<main>
-<h1>Heaven and Earth</h1>
+<h1>The Sky Clock</h1>
 <p>A clock that shows the sky above you, drawn every second.</p>
 <p>This paragraph is going away entirely in the new version of the page.</p>
 <p>Unchanged text stays as it is<sup>1</sup>.</p>
@@ -47,7 +47,7 @@ const reference = {
 };
 const dev = {
   "/": page(`<main>
-<h1>Heaven and Earth</h1>
+<h1>The Sky Clock</h1>
 <p>A clock that shows the whole sky above you, redrawn every second.</p>
 <p>Unchanged text stays as it is<sup>2</sup>.</p>
 <p>A brand new paragraph about astrolabes and their makers.</p>
@@ -91,7 +91,8 @@ const context = await chromium.launchPersistentContext(
   {
     channel: "chromium",
     headless: !process.env.HEADED,
-    viewport: { width: 900, height: 900 },
+    // STORE=1 makes the screenshots the Chrome Web Store's size.
+    viewport: process.env.STORE ? { width: 1280, height: 800 } : { width: 900, height: 900 },
     args: [`--disable-extensions-except=${ext}`, `--load-extension=${ext}`],
   }
 );
