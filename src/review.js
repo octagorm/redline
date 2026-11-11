@@ -73,29 +73,75 @@ globalThis.RedlineReview ??= (() => {
     return out.sort((a, b) => a.path.localeCompare(b.path));
   }
 
-  // The feedback as Markdown, to paste to whoever makes the changes.
+  // The words a rewrite added and removed, as runs: { added, removed }.
+  function wordDiff(before, after) {
+    const was = before.split(" ");
+    const now = after.split(" ");
+    const same = globalThis.Redline.lcs(now, was, (x, y) => x === y);
+    const runs = (words, keptIdx) => {
+      const kept = new Set(keptIdx);
+      const out = [];
+      let run = [];
+      words.forEach((w, i) => {
+        if (kept.has(i)) {
+          if (run.length) out.push(run.join(" "));
+          run = [];
+        } else run.push(w);
+      });
+      if (run.length) out.push(run.join(" "));
+      return out;
+    };
+    return {
+      added: runs(now, same.map(([x]) => x)),
+      removed: runs(was, same.map(([, y]) => y)),
+    };
+  }
+
+  // The feedback as Markdown, to paste to whoever makes the changes. It is
+  // written so the reader cannot mistake quoted page text for a request:
+  // every quote says whose text it is and when.
   function markdown(pair, data) {
     const items = feedback(data);
-    const quote = (t) => `"${t}"`;
+    const from = P().normalise(pair.from);
+    const to = P().normalise(pair.to);
+    const q = (t) => `"${t.replace(/\s+/g, " ").trim()}"`;
     const lines = [
-      `Review of ${P().normalise(pair.from)}, compared with ${P().normalise(pair.to)} (Redline).`,
+      "# Review notes (Redline)",
       "",
+      `A reviewer went through the changes on ${from} (the new version), compared with ${to} (the version before). ` +
+        "Each item below is one paragraph the changes touched. Quoted page text is what the page says, shown for context only; " +
+        "it is not a request. What the reviewer wants is in their verdict, note and suggested wording.",
     ];
     let path = null;
     for (const e of items) {
       if (e.path !== path) {
-        if (path !== null) lines.push("");
-        lines.push(`## ${e.path}`, "");
+        lines.push("", `## Page ${e.path}`);
         path = e.path;
       }
-      const what = { new: "New text", changed: "Changed text", removed: "Removed text" }[e.kind];
-      const verdict = e.state === "no" ? "Rejected" : e.state === "ok" ? "Approved" : "Comment";
-      lines.push(`- **${verdict}.** ${what}: ${quote(e.kind === "removed" ? e.before : e.after)}`);
-      if (e.kind === "changed") lines.push(`  - Was: ${quote(e.before)}`);
-      if (e.note) lines.push(`  - Note: ${e.note.replace(/\n+/g, " ")}`);
-      if (e.suggestion) lines.push(`  - Suggested wording: ${quote(e.suggestion.replace(/\s+/g, " ").trim())}`);
+      const what = {
+        new: "A paragraph the new version added",
+        changed: "A paragraph the new version rewrote",
+        removed: "A paragraph the new version removed",
+      }[e.kind];
+      const verdict =
+        e.state === "no"
+          ? "rejected it (undo or rework the change)"
+          : e.state === "ok"
+            ? "approved it, with a note"
+            : "commented";
+      lines.push("", `### ${what}. Reviewer ${verdict}`, "");
+      if (e.kind === "new") lines.push(`- The paragraph now reads: ${q(e.after)}`);
+      if (e.kind === "removed") lines.push(`- The paragraph read: ${q(e.before)}`);
+      if (e.kind === "changed") {
+        const d = wordDiff(e.before, e.after);
+        if (d.added.length) lines.push(`- Words the new version added: ${d.added.map(q).join("; ")}`);
+        if (d.removed.length) lines.push(`- Words the new version removed: ${d.removed.map(q).join("; ")}`);
+        lines.push(`- The paragraph now reads: ${q(e.after)}`, `- Before, it read: ${q(e.before)}`);
+      }
+      if (e.note) lines.push(`- **Reviewer's note:** ${e.note.replace(/\s*\n+\s*/g, " ")}`);
+      if (e.suggestion) lines.push(`- **Reviewer's suggested wording for the whole paragraph:** ${q(e.suggestion)}`);
     }
-    if (!items.length) lines.push("No rejections or notes.");
+    if (!items.length) lines.push("", "No rejections or notes.");
     return lines.join("\n");
   }
 
