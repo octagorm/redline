@@ -75,6 +75,29 @@ itself and says nothing changed. Or render it only on previews, for example:
   production branch.
 - **Netlify**: when `CONTEXT` is `deploy-preview` or `branch-deploy`.
 
+- **GitHub Pages**: Pages has no previews of its own, but the
+  [pr-preview-action](https://github.com/rossjrw/pr-preview-action) publishes
+  each pull request to a folder of the live site, by default
+  `https://<user>.github.io/<repo>/pr-preview/pr-<number>/`. As that preview
+  shares its address with the live site, also tell Redline which folder it is,
+  so it compares `…/pr-preview/pr-5/about` with `…/about`:
+
+  ```html
+  <meta name="redline" content="https://<user>.github.io/<repo>">
+  <meta name="redline-root" content="/<repo>/pr-preview/pr-5/">
+  ```
+
+  In the workflow, pass the folder to the build, for example as
+  `REDLINE_ROOT: /${{ github.event.repository.name }}/pr-preview/pr-${{ github.event.number }}/`,
+  and render the two tags only when it is set.
+
+Vercel, Cloudflare and Netlify post their preview links on the pull request
+themselves, so with the tag in place, a reviewer can open the link from the PR
+and click Redline.
+
+The same works by hand: in the settings, "this site" can be a folder, such as
+`me.github.io/site/pr-preview/pr-5`.
+
 In Next.js, for instance:
 
 ```tsx

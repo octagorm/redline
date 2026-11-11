@@ -7,8 +7,10 @@
 // 3. Toolbar button: turn Redline on or off in the tab, or open the options
 //    page prefilled with the tab's origin when it is not in a pair yet.
 
+importScripts("pairs.js");
+
 const SCRIPT_ID = "redline";
-const FILES = ["src/diff.js", "src/content.js"];
+const FILES = ["src/pairs.js", "src/diff.js", "src/content.js"];
 
 // Match patterns cannot name a port, so this covers every port on the host;
 // the content script then checks the exact origin against the pairs.
@@ -93,7 +95,7 @@ async function onAction(tab) {
   } catch {
     return;
   }
-  const known = (await pairs()).some((p) => sameOrigin(p.from, origin));
+  const known = RedlinePairs.pairFor(await pairs(), tab.url);
   if (!known && !(await fromSite(tab, origin))) return;
   try {
     await chrome.tabs.sendMessage(tab.id, { type: "toggle" });
@@ -123,13 +125,23 @@ async function fromSite(tab, origin) {
       func: () => {
         const meta = (n) =>
           document.querySelector(`meta[name="${n}"]`)?.getAttribute("content")?.trim();
-        return { to: meta("redline"), ignore: meta("redline-ignore") };
+        return {
+          to: meta("redline"),
+          root: meta("redline-root"),
+          ignore: meta("redline-ignore"),
+        };
       },
     });
     if (result?.to) {
       const to = new URL(result.to, tab.url);
       if (/^https?:$/.test(to.protocol))
-        hint = { to: to.origin + to.pathname.replace(/\/+$/, ""), ignore: result.ignore };
+        hint = {
+          to: RedlinePairs.normalise(to.href),
+          // A preview served from a folder of a site, such as GitHub Pages
+          // previews under /pr-preview/pr-5/, names that folder.
+          from: RedlinePairs.normalise(new URL(result.root || "/", tab.url).href),
+          ignore: result.ignore,
+        };
     }
   } catch {
     // A page extensions may not read, such as the Chrome Web Store.
@@ -148,7 +160,7 @@ async function fromSite(tab, origin) {
     if (granted) {
       const list = await pairs();
       list.push({
-        from: origin,
+        from: hint.from,
         to: hint.to,
         ignore: hint.ignore ?? "nav, footer",
         blocks: "",
@@ -159,19 +171,11 @@ async function fromSite(tab, origin) {
       return true;
     }
   }
-  const q = new URLSearchParams({ from: origin });
+  const q = new URLSearchParams({ from: hint?.from ?? origin });
   if (hint) {
     q.set("to", hint.to);
     if (hint.ignore) q.set("ignore", hint.ignore);
   }
   chrome.tabs.create({ url: chrome.runtime.getURL(`src/options.html?${q}`) });
   return false;
-}
-
-function sameOrigin(a, b) {
-  try {
-    return new URL(a).origin === new URL(b).origin;
-  } catch {
-    return false;
-  }
 }

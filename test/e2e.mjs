@@ -72,11 +72,12 @@ function serve(pages, port, needCookie) {
   return new Promise((ok) => server.listen(port, () => ok(server)));
 }
 
-// A preview build that names its reference itself, so it needs no setup.
+// A preview build that names its reference itself, so it needs no setup. It
+// is served from a folder, as GitHub Pages PR previews are.
 const preview = {
-  "/": dev["/"].replace(
+  "/pr-preview/pr-5/": dev["/"].replace(
     "<head>",
-    `<head><meta name="redline" content="http://127.0.0.1:47312"><meta name="redline-ignore" content="nav, footer, sup">`
+    `<head><meta name="redline" content="http://127.0.0.1:47312"><meta name="redline-root" content="/pr-preview/pr-5/"><meta name="redline-ignore" content="nav, footer, sup">`
   ),
 };
 const previewServer = await serve(preview, 47313, false);
@@ -229,7 +230,7 @@ try {
 
   // A site with a <meta name="redline"> tag: pressing the button sets up the
   // pair from the tag and starts.
-  await tab.goto("http://localhost:47313/");
+  await tab.goto("http://localhost:47313/pr-preview/pr-5/");
   await tab.waitForTimeout(500);
   await sw.evaluate(async () => {
     const [t] = await chrome.tabs.query({ url: "http://localhost:47313/*" });
@@ -239,7 +240,7 @@ try {
   const saved = await sw.evaluate(async () => (await chrome.storage.sync.get("pairs")).pairs);
   assert.ok(
     saved.some(
-      (p) => p.from === "http://localhost:47313" && p.to === "http://127.0.0.1:47312" && p.ignore === "nav, footer, sup"
+      (p) => p.from === "http://localhost:47313/pr-preview/pr-5" && p.to === "http://127.0.0.1:47312" && p.ignore === "nav, footer, sup"
     ),
     "the pair from the tag is saved"
   );

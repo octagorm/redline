@@ -60,7 +60,8 @@ function check(pairs) {
         return `"${p[f]}" is not a valid CSS selector.`;
       }
     }
-    p.from = new URL(p.from).origin;
+    p.from = RedlinePairs.normalise(p.from);
+    p.to = RedlinePairs.normalise(p.to);
   }
   return null;
 }

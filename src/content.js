@@ -1,4 +1,4 @@
-// Runs on every page of a "this site" origin. Does nothing until Redline is
+// Runs on every page of a "this site" host. Does nothing until Redline is
 // turned on for the tab (toolbar button, Alt+Shift+R, or `?redline` in the
 // URL). Once on, it stays on for the tab across navigation, like the page's
 // sessionStorage, until turned off.
@@ -28,15 +28,7 @@
 
   async function findPair() {
     const { pairs = [] } = await chrome.storage.sync.get("pairs");
-    return (
-      pairs.find((p) => {
-        try {
-          return new URL(p.from).origin === location.origin;
-        } catch {
-          return false;
-        }
-      }) ?? null
-    );
+    return globalThis.RedlinePairs.pairFor(pairs, location.href);
   }
 
   function wanted() {
@@ -183,10 +175,10 @@
     R.clear();
     addStyle();
     document.documentElement.classList.add("redline-on");
-    const base = pair.to.replace(/\/+$/, "");
     const here = new URL(location.href);
     here.searchParams.delete(KEY);
-    const url = base + here.pathname + here.search;
+    const url = globalThis.RedlinePairs.referenceFor(pair, here.href);
+    const base = new URL(url).origin;
     render("comparing…", url);
     await settled();
     if (id !== runId) return;
