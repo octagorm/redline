@@ -39,7 +39,7 @@ got.
 
 ## Pages
 
-**pages** in the badge lists every page of the site that differs, with its
+**pages** in the badge (or <kbd>P</kbd>) lists every page of the site that differs, with its
 number of changes, and pages that are new or were removed. Click one to open
 it with Redline on. It finds the pages from the site's `sitemap.xml` (and the
 other site's, to catch removed pages), or, without one, by following links

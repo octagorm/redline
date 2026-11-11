@@ -360,7 +360,7 @@ try {
   console.log("big site page:", await waitBadge(/change/));
   const shadow = (sel) => `document.querySelector("#redline-host").shadowRoot.querySelector(${JSON.stringify(sel)})`;
   const started = Date.now();
-  await tab.evaluate(`${shadow(".pages")}.click()`);
+  await tab.keyboard.press("p"); // P opens the pages list
   await tab.waitForFunction(`${shadow(".pnote")}.textContent.startsWith("checked")`, null, { timeout: 30000 });
   const note = await tab.evaluate(`${shadow(".pnote")}.textContent`);
   console.log("big site:", await tab.evaluate(`${shadow(".ptitle")}.textContent`), "|", note, "|", await tab.evaluate(`${shadow(".more")}.textContent`), `| ${Date.now() - started} ms`);

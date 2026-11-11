@@ -128,13 +128,14 @@
 B       next view: all, added, removed
 A       approve the change
 X       reject it
-C       add a note or wording"><span>J↓</span><span>K↑</span><span>B</span><span class="k-ok">A ✓</span><span class="k-no">X ✗</span><span>C ✎</span></span>
+C       add a note or wording
+P       pages: which pages differ"><span>J↓</span><span>K↑</span><span>B</span><span class="k-ok">A ✓</span><span class="k-no">X ✗</span><span>C ✎</span><span>P</span></span>
   <span class="modes" hidden>
     <button data-mode="all" data-tip="New words highlighted, removed ones struck through (B)">all</button>
     <button data-mode="added" data-tip="Only what is new (B)">added</button>
     <button data-mode="removed" data-tip="The other site's wording, removed words struck through (B)">removed</button>
   </span>
-  <button class="pages" data-tip="Which pages of the site differ">pages</button>
+  <button class="pages" data-tip="Which pages of the site differ   P">pages</button>
   <button class="notes" hidden data-tip="Copy your rejections, notes and suggested wording as a list">copy notes</button>
   <button class="again" data-tip="Compare again">again</button>
   <button class="off" data-tip="Turn Redline off for this tab">hide</button>
@@ -845,13 +846,15 @@ C       add a note or wording"><span>J↓</span><span>K↑</span><span>B</span><
   addEventListener(
     "keydown",
     (e) => {
-      if (!state.on || !state.count) return;
+      if (!state.on || state.count === null) return;
       if (e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
       const t = e.composedPath()[0];
       if (t?.closest?.("input, textarea, select, [contenteditable]") || t?.isContentEditable)
         return;
       const key = e.key.toLowerCase();
-      if (key === "b")
+      if (key === "p") togglePages();
+      else if (!state.count) return;
+      else if (key === "b")
         setMode(MODES[(MODES.indexOf(state.mode) + 1) % MODES.length]);
       else if ((key === "a" || key === "x") && tools.change) {
         // Approve or reject, then on to the next change.
