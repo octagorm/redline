@@ -6,7 +6,9 @@ Redline collects no data and sends no data anywhere.
   browser, to compare them.
 - To compare, it fetches the same page from the two sites you paired, the way
   your browser would if you opened them, with your own cookies for those
-  sites. Those requests go only to the sites you entered.
+  sites. Those requests go only to the sites you entered. For a pair set to
+  render, it opens the page in a background tab instead, reads its text and
+  closes the tab.
 - Your reviews (which changes you approved or rejected, your notes and
   suggested wording) stay in this browser's extension storage. They leave it
   only when you copy them yourself.

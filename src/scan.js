@@ -24,6 +24,15 @@ globalThis.RedlineScan ??= (() => {
       .sendMessage({ type: "fetch", url })
       .catch((e) => ({ ok: false, status: 0, error: String(e) }));
 
+  // A page of the pair, rendered in a background tab when the pair says so
+  // (both sides, as an app drawn in the browser has no server text).
+  const load = (pair, url) =>
+    pair.render
+      ? chrome.runtime
+          .sendMessage({ type: "fetch", url, render: true, scope: pair.scope?.trim() || "" })
+          .catch((e) => ({ ok: false, status: 0, error: String(e) }))
+      : get(url);
+
   const parse = (html) => new DOMParser().parseFromString(html, "text/html");
 
   const pathOf = (url) => new URL(url).pathname.replace(/\/+$/, "");
@@ -126,7 +135,7 @@ globalThis.RedlineScan ??= (() => {
     const seen = new Set([here]);
     while (queue.length && crawled.size < MAX_CRAWL && !signal.stopped) {
       const batch = queue.splice(0, AT_ONCE);
-      const pages = await Promise.all(batch.map((rest) => get(fromRoot + rest)));
+      const pages = await Promise.all(batch.map((rest) => load(pair, fromRoot + rest)));
       for (const [k, res] of pages.entries()) {
         crawled.set(batch[k], res);
         if (!res.ok) continue;
@@ -169,8 +178,8 @@ globalThis.RedlineScan ??= (() => {
     const one = async (rest) => {
       const url = fromRoot + rest;
       const [mine, theirs] = await Promise.all([
-        crawled.get(rest) ?? get(url),
-        get(toRoot + rest),
+        crawled.get(rest) ?? load(pair, url),
+        load(pair, toRoot + rest),
       ]);
       done++;
       progress(done);

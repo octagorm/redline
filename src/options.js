@@ -1,11 +1,16 @@
 const list = document.getElementById("pairs");
 const tpl = document.getElementById("tpl");
 const status = document.getElementById("status");
-const FIELDS = ["from", "to", "ignore", "blocks"];
+const FIELDS = ["from", "to", "ignore", "blocks", "scope", "render"];
+const isBox = (input) => input.type === "checkbox";
 
 function addPair(p = {}) {
   const node = tpl.content.firstElementChild.cloneNode(true);
-  for (const f of FIELDS) node.querySelector(`[name=${f}]`).value = p[f] ?? "";
+  for (const f of FIELDS) {
+    const input = node.querySelector(`[name=${f}]`);
+    if (isBox(input)) input.checked = !!p[f];
+    else input.value = p[f] ?? "";
+  }
   node.querySelector(".remove").onclick = () => node.remove();
   list.append(node);
   return node;
@@ -15,7 +20,10 @@ function read() {
   return [...list.querySelectorAll(".pair")]
     .map((node) =>
       Object.fromEntries(
-        FIELDS.map((f) => [f, node.querySelector(`[name=${f}]`).value.trim()])
+        FIELDS.map((f) => {
+          const input = node.querySelector(`[name=${f}]`);
+          return [f, isBox(input) ? input.checked : input.value.trim()];
+        })
       )
     )
     .filter((p) => p.from || p.to);
@@ -52,7 +60,7 @@ function check(pairs) {
         return `"${p[f] || "(empty)"}" is not an http or https address.`;
       }
     }
-    for (const f of ["ignore", "blocks"]) {
+    for (const f of ["ignore", "blocks", "scope"]) {
       if (!p[f]) continue;
       try {
         document.querySelector(p[f]);
@@ -105,10 +113,18 @@ document.getElementById("save").onclick = async () => {
     // The site's tag names another reference than the saved pair.
     existing.querySelector("[name=to]").value = to;
     if (q.get("ignore")) existing.querySelector("[name=ignore]").value = q.get("ignore");
+    if (q.get("scope")) existing.querySelector("[name=scope]").value = q.get("scope");
+    existing.querySelector("[name=render]").checked = !!q.get("render");
     status.textContent = `This site asks to be compared with ${to} now. Save to allow it.`;
     document.getElementById("save").focus();
   } else if (from && !existing) {
-    const node = addPair({ from, to: to ?? "", ignore: q.get("ignore") ?? "nav, footer" });
+    const node = addPair({
+      from,
+      to: to ?? "",
+      ignore: q.get("ignore") ?? "nav, footer",
+      scope: q.get("scope") ?? "",
+      render: !!q.get("render"),
+    });
     if (to) {
       status.textContent = `This site asks to be compared with ${to}. Save to allow it.`;
       document.getElementById("save").focus();

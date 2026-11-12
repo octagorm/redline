@@ -12,6 +12,8 @@
   .pair { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; display: grid; grid-template-columns: 9em 1fr; gap: 8px 12px; align-items: center; }
   .pair label { font-weight: 600; }
   .pair input { font: 13px ui-monospace, Menlo, monospace; padding: 5px 7px; border: 1px solid var(--line); border-radius: 5px; background: transparent; color: inherit; width: 100%; box-sizing: border-box; }
+  .pair label.check { font-weight: normal; display: flex; gap: 8px; align-items: center; }
+  .pair input[type=checkbox] { width: auto; margin: 0; }
   .pair .hint { grid-column: 2; font-size: 12px; opacity: .7; margin-top: -4px; }
   .pair .row-end { grid-column: 1 / -1; text-align: right; }
   button { font: inherit; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: inherit; cursor: pointer; }
@@ -40,6 +42,7 @@
   <p>Redline fetches the reference page with your cookies for that site and reads both pages as text blocks: paragraphs, headings, list items, table cells and so on. Blocks the reference has the same are left alone. New words are highlighted and removed words struck through beside them; <kbd>V</kbd> switches between all changes, only what was added, and only what was removed; <kbd>J</kbd> and <kbd>K</kbd> go to the next and previous change. Beside each change, <kbd>A</kbd> approves it, <kbd>X</kbd> rejects it and <kbd>C</kbd> adds a note or suggested wording; "copy notes" in the badge copies them all.</p>
   <p>It compares the two pages as their servers send them, before any script runs, and uses the live page only to find each block on screen. So text a script draws in the browser, like a clock or a relative date, never counts as a change. A page built entirely in the browser has no server text, so there Redline diffs the live page against the reference's server text instead.</p>
   <p>Use "Ignore" for text that differs between the servers but is not content: footnote numbers that shift when a note is added, a build time, a version string.</p>
+  <p>Some apps are drawn entirely in the browser, such as a micro-frontend mounted in a host page, and their server sends no text at all. For those, turn on "Render": Redline opens the reference in a background tab with your sign-in, waits until its scripts have drawn it, and compares that with the live page. "Compare within" leaves out what the host page puts around the app, such as its header and menus. Make sure "This site" and "Compare with" give the same page: if the app runs at <code>localhost:3000/app/…</code> locally and <code>example.com/app/…</code> online, compare <code>localhost:3000</code> with <code>example.com</code>.</p>
 </details>
 
 <template id="tpl">
@@ -55,6 +58,12 @@
     <label>Text blocks</label>
     <input name="blocks" placeholder="default" spellcheck="false">
     <div class="hint">Optional CSS selector for what counts as a block. Leave empty for the default.</div>
+    <label>Compare within</label>
+    <input name="scope" placeholder="whole page" spellcheck="false">
+    <div class="hint">Optional CSS selector for the part of the page to compare, such as a micro-frontend's mount point (<code>#app</code>). A page without it is compared whole.</div>
+    <label>Render</label>
+    <label class="check"><input type="checkbox" name="render"> Run the pages' scripts before comparing</label>
+    <div class="hint">For apps drawn in the browser, whose server sends an empty shell. Redline opens the reference in a background tab, reads it once drawn and closes it.</div>
     <div class="row-end"><button class="link remove">Remove</button></div>
   </div>
 </template>

@@ -80,13 +80,38 @@ It should work the same in other Chromium browsers (Brave, Arc, Edge).
 
 ![Settings](docs/settings.png)
 
-Each pair has two optional fields:
+Each pair has these optional fields:
 
 - **Ignore**: a CSS selector for text that differs between the two sites but is
   not content, such as menus, footers, footnote numbers (`sup`) or a build
   stamp. Default for new pairs: `nav, footer`.
 - **Text blocks**: a CSS selector for what counts as a block. The default is
   `p, h1–h6, li, dt, dd, blockquote, pre, td, th, caption, figure, summary`.
+- **Compare within**: a CSS selector for the part of the page to compare, such
+  as an app's mount point. A page without that element is compared whole.
+- **Render**: for apps drawn in the browser; see below.
+
+## Micro-frontends and other apps drawn in the browser
+
+A single-page app, or a micro-frontend mounted in a host page, has no text in
+the HTML its server sends: only an empty element that its scripts fill in.
+For a pair like that, turn on **Render**. Redline then opens the reference
+page in a background tab next to yours (with your sign-in, like any tab),
+waits until its scripts have drawn it, reads it, closes the tab, and compares
+it with the live page.
+
+Online, a micro-frontend usually sits inside a host page with its own header
+and menus, while locally it runs on its own. Set **Compare within** to the
+element the app is mounted in, such as `#my-app`, so the host's text does not
+show up as removed.
+
+Mind the paths, too: Redline looks up the same path on the other site. If the
+app runs at `localhost:3000/app/case/1` locally and at
+`example.com/app/case/1` online, compare `http://localhost:3000` with
+`https://example.com`, not with `https://example.com/app`.
+
+With Render on, the pages list renders both sides of every page it checks,
+two tabs at a time, so it is slower than for server-rendered sites.
 
 ## Let your site set it up
 
@@ -97,6 +122,9 @@ the settings. Put this in the `<head>` of every page:
 <meta name="redline" content="https://example.com">
 <!-- optional: text that differs but is not content -->
 <meta name="redline-ignore" content="nav, footer, sup">
+<!-- optional, for apps drawn in the browser: render, and compare only #app -->
+<meta name="redline-render" content="true">
+<meta name="redline-scope" content="#app">
 ```
 
 Clicking the Redline button on a page with the tag saves the pair and starts
@@ -167,10 +195,13 @@ live page only to find each block on screen. So text drawn in the browser,
 like a clock or "3 minutes ago", never shows up as a change. Pages built
 entirely in the browser have no server text; for those, the live page is
 diffed against the reference's server text, and **Ignore** is the way to keep
-browser-drawn text out.
+browser-drawn text out. With **Render** on, the reference is drawn in a
+background tab too, and the live page is diffed against that.
 
 The highlights are made by wrapping words in `<mark>` and inserting the old
-blocks next to the new ones. On pages run by a framework such as React this
+blocks next to the new ones. In a table, a description list or a CSS grid, a
+removed cell goes inside the cell before it instead, so the layout keeps its
+columns. On pages run by a framework such as React this
 edits the DOM under it, which is fine for prose but can confuse a page that
 re-renders the same text. **again** in the badge compares afresh, for example
 after a hot reload.

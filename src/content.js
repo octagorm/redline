@@ -273,28 +273,39 @@ P       pages: which pages differ"><span>J↓</span><span>K↑</span><span>V</sp
     await settled();
     if (id !== runId) return;
 
-    const get = (u) =>
-      chrome.runtime
-        .sendMessage({ type: "fetch", url: u })
-        .catch((e) => ({ ok: false, status: 0, error: String(e) }));
-    // This page as its own server sends it, too: see show() in diff.js.
-    const [res, mine] = await Promise.all([get(url), get(location.href)]);
-    if (id !== runId || !state.on) return;
-
     const opt = options();
     if (!opt) {
       render("a selector in this site's settings is not valid CSS");
       return;
     }
+    const rendered = !!pair.render;
+    if (rendered) render("rendering the reference…", url);
+    const get = (u, extra) =>
+      chrome.runtime
+        .sendMessage({ type: "fetch", url: u, ...extra })
+        .catch((e) => ({ ok: false, status: 0, error: String(e) }));
+    // This page as its own server sends it, too: see show() in diff.js. When
+    // the reference is rendered, both sides are as drawn in the browser, so
+    // the live page is diffed as it is.
+    const [res, mine] = await Promise.all([
+      get(url, rendered ? { render: true, scope: opt.scope } : {}),
+      rendered ? null : get(location.href),
+    ]);
+    if (id !== runId || !state.on) return;
 
     let old;
     let note = "";
     if (res.ok) {
       const doc = new DOMParser().parseFromString(res.text, "text/html");
       old = R.blocks(doc, opt);
-      if (!old.length) note = " (the reference page has no text: is it drawn by scripts?)";
+      if (!old.length)
+        note = rendered
+          ? " (the reference page has no text)"
+          : ' (the reference page has no text: is it drawn by scripts? Try "Render the reference" in the settings)';
       if (res.url && new URL(res.url).pathname !== new URL(url).pathname)
         note += ` (redirected to ${res.url})`;
+      if (opt.scope && !doc.querySelector(opt.scope))
+        note += ` (no ${opt.scope} on the reference)`;
     } else if (res.status === 404) {
       old = []; // a page the reference does not have is new from top to bottom
       note = " (not on the reference: 404)";
@@ -302,9 +313,11 @@ P       pages: which pages differ"><span>J↓</span><span>K↑</span><span>V</sp
       render(
         res.status
           ? `reference answered ${res.status}`
-          : pair.fromSite
-            ? `click the Redline button to allow ${new URL(url).host}`
-            : "could not reach the reference",
+          : res.error?.startsWith("could not render")
+            ? "could not render the reference"
+            : pair.fromSite
+              ? `click the Redline button to allow ${new URL(url).host}`
+              : "could not reach the reference",
         res.error ?? url
       );
       return;
@@ -313,7 +326,7 @@ P       pages: which pages differ"><span>J↓</span><span>K↑</span><span>V</sp
     // Pages built in the browser have no server text to go by; for those, and
     // when this page cannot be fetched, the live page is diffed as it is.
     let own;
-    if (mine.ok) {
+    if (mine?.ok) {
       own = R.blocks(new DOMParser().parseFromString(mine.text, "text/html"), opt)
         .map((b) => b.text);
       if (!own.length) own = undefined;
@@ -335,12 +348,18 @@ P       pages: which pages differ"><span>J↓</span><span>K↑</span><span>V</sp
     );
   }
 
-  // The pair's ignore and block selectors, or null when one is not valid CSS.
+  // The pair's ignore, block and scope selectors, or null when one is not
+  // valid CSS.
   function options() {
-    const opt = { ignore: pair?.ignore?.trim() || "", blocks: pair?.blocks?.trim() || "" };
+    const opt = {
+      ignore: pair?.ignore?.trim() || "",
+      blocks: pair?.blocks?.trim() || "",
+      scope: pair?.scope?.trim() || "",
+    };
     try {
       if (opt.ignore) document.querySelector(opt.ignore);
       if (opt.blocks) document.querySelector(opt.blocks);
+      if (opt.scope) document.querySelector(opt.scope);
     } catch {
       return null;
     }

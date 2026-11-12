@@ -62,7 +62,9 @@ globalThis.RedlinePairs ??= (() => {
   //   <meta name="redline" content="https://example.com">
   //   <meta name="redline-root" content="/pr-preview/pr-5/">   (optional)
   //   <meta name="redline-ignore" content="nav, footer, sup">  (optional)
-  // `meta` holds those three contents, as readMeta() returns them. The tag
+  //   <meta name="redline-render" content="true">          (optional)
+  //   <meta name="redline-scope" content="#app">           (optional)
+  // `meta` holds those contents, as readMeta() returns them. The tag
   // wins over a saved pair, so a second project served on the same
   // localhost port compares with its own reference, not the last one's.
   function hintFrom(meta, href) {
@@ -78,6 +80,8 @@ globalThis.RedlinePairs ??= (() => {
         to: normalise(to.href),
         ignore: meta.ignore ?? "nav, footer",
         blocks: "",
+        scope: meta.scope ?? "",
+        render: meta.render != null && !/^(false|0|no|off)$/i.test(meta.render),
         fromSite: true,
       };
     } catch {
@@ -89,7 +93,13 @@ globalThis.RedlinePairs ??= (() => {
   function readMeta() {
     const meta = (n) =>
       document.querySelector(`meta[name="${n}"]`)?.getAttribute("content")?.trim();
-    return { to: meta("redline"), root: meta("redline-root"), ignore: meta("redline-ignore") };
+    return {
+      to: meta("redline"),
+      root: meta("redline-root"),
+      ignore: meta("redline-ignore"),
+      render: meta("redline-render"),
+      scope: meta("redline-scope"),
+    };
   }
 
   return { pairFor, referenceFor, restFor, normalise, hintFrom, readMeta };

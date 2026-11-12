@@ -111,6 +111,36 @@ function bigSite(port, changed) {
   });
   return new Promise((ok) => server.listen(port, () => ok(server)));
 }
+// A micro-frontend: the server sends an empty shell, and a script draws the
+// app into #mfe a moment later. Online it sits in a host page with its own
+// header and menu; locally it runs on its own.
+const app = (text) => `<div id="mfe"></div><script>
+  setTimeout(() => {
+    document.getElementById("mfe").innerHTML = ${JSON.stringify(text)};
+  }, 300);
+</script>`;
+// A description list laid out as a grid, terms in one column and their
+// descriptions in the other, as design systems often draw them.
+const dl = (items) => `<dl style="display:grid;grid-template-columns:auto 1fr;gap:4px 16px">${items}</dl>`;
+const mfeRef = await serve(
+  {
+    "/rut/henvendelse/1": `<!doctype html><html><body>
+<header><h1>Host header</h1><p>Signed in as a case handler.</p></header>
+${app(`<h2>Application</h2>${dl("<dt>Dato mottatt</dt><dd>13.10.2026</dd><dt>Status</dt><dd>Ny</dd><dt>Dokument</dt><dd>a.pdf</dd>")}<p>The company asks for a refund of VAT.</p><p>Documents are attached.</p>`)}
+</body></html>`,
+  },
+  47317,
+  false
+);
+const mfeDev = await serve(
+  {
+    "/rut/henvendelse/1": `<!doctype html><html><body>
+${app(`<h2>Application</h2>${dl("<dt>Mottatt dato</dt><dd>13.10.2026</dd><dt>Dokument</dt><dd>a.pdf</dd>")}<p>The company asks for a full refund of VAT.</p><p>Documents are attached.</p>`)}
+</body></html>`,
+  },
+  47316,
+  false
+);
 const bigDev = await bigSite(47314, true);
 const bigRef = await bigSite(47315, false);
 const devServer = await serve(dev, 47311, false);
@@ -396,6 +426,56 @@ try {
   console.log("after stop:", stoppedAt);
   assert.match(stoppedAt, /^checked (2\d\d) of/);
 
+  // A micro-frontend: the reference is rendered in a background tab, and
+  // only the app's own container is compared, not the host page around it.
+  await sw.evaluate(async () => {
+    const { pairs } = await chrome.storage.sync.get("pairs");
+    pairs.push({ from: "http://localhost:47316", to: "http://127.0.0.1:47317", ignore: "", blocks: "", scope: "#mfe", render: true });
+    await chrome.storage.sync.set({ pairs });
+  });
+  await tab.waitForTimeout(300);
+  await tab.goto("http://localhost:47316/rut/henvendelse/1?redline");
+  console.log("micro-frontend:", await waitBadge(/change/));
+  assert.deepEqual(await tab.$$eval("mark.redline-new", (m) => m.map((x) => x.textContent)), ["Mottatt dato", "full"]);
+  assert.equal(await tab.$eval("dt", (e) => e.hasAttribute("data-redline-changed")), true, "a term with its words swapped is a rewrite");
+  assert.deepEqual(
+    await tab.$$eval(".redline-removed", (e) => e.map((x) => x.textContent)),
+    ["Status", "Ny"],
+    "the host page's header is not removed text; the removed row is"
+  );
+  // Removed cells go inside a cell, so the list keeps its two columns in
+  // every view: each term on the left, each description on the right.
+  for (const view of ["all", "added", "removed"]) {
+    const columns = await tab.$$eval("dl > dt, dl > dd", (els) =>
+      els
+        .filter((e) => e.getClientRects().length)
+        .map((e) => `${e.tagName}@${Math.round(e.getBoundingClientRect().left)}`)
+    );
+    const at = (tag) => new Set(columns.filter((c) => c.startsWith(tag)).map((c) => c.split("@")[1]));
+    console.log(`  ${view}:`, columns.join(" "));
+    if (!process.env.STORE)
+      await (await tab.$("dl")).screenshot({ path: path.join(out, `grid-${view}.png`) });
+    assert.equal(at("DT").size, 1, `terms stay in one column (${view})`);
+    assert.equal(at("DD").size, 1, `descriptions stay in one column (${view})`);
+    assert.notDeepEqual([...at("DT")], [...at("DD")]);
+    await tab.keyboard.press("v");
+  }
+  assert.equal(
+    context.pages().filter((p) => p.url().startsWith("http://127.0.0.1:47317")).length,
+    0,
+    "the tab that rendered the reference is closed"
+  );
+  // The same settings can come from the page's meta tags.
+  const hinted = await sw.evaluate(() =>
+    RedlinePairs.hintFrom({ to: "http://127.0.0.1:47317", render: "", scope: "#mfe" }, "http://localhost:47316/rut/henvendelse/1")
+  );
+  assert.equal(hinted.render, true);
+  assert.equal(hinted.scope, "#mfe");
+  assert.equal(
+    (await sw.evaluate(() => RedlinePairs.hintFrom({ to: "http://127.0.0.1:47317", render: "false" }, "http://localhost:47316/"))).render,
+    false
+  );
+
   // hide turns it off and puts the page back.
   await tab.goto(DEV + "/");
   await waitBadge(/change/);
@@ -442,6 +522,24 @@ try {
   const crawled = await pagesList();
   console.log("crawled pages:", crawled);
   assert.deepEqual(crawled, ["/ 3 to review"]);
+  // The settings, with a pair for an app drawn in the browser.
+  await sw.evaluate(() =>
+    chrome.storage.sync.set({
+      pairs: [
+        { from: "http://localhost:3000", to: "https://example.com", ignore: "nav, footer", blocks: "", scope: "#app", render: true },
+      ],
+    })
+  );
+  const settings = await context.newPage();
+  await settings.setViewportSize(process.env.STORE ? { width: 1280, height: 800 } : { width: 820, height: 900 });
+  await settings.goto(`chrome-extension://${new URL(sw.url()).host}/src/options.html`);
+  await settings.waitForSelector("[name=render]");
+  assert.equal(await settings.$eval("[name=render]", (e) => e.checked), true, "Render is shown as saved");
+  assert.equal(await settings.$eval("[name=scope]", (e) => e.value), "#app");
+  if (process.env.STORE) await settings.addStyleTag({ content: "html{zoom:1.3} body{margin-top:20px}" });
+  else await settings.evaluate(() => (document.querySelector("details").open = true));
+  await settings.screenshot({ path: path.join(out, "settings.png"), fullPage: !process.env.STORE });
+  await settings.close();
   console.log("\nall checks passed; screenshots in test/out/");
 } catch (e) {
   failed = true;
@@ -452,6 +550,8 @@ try {
   bigDev.close();
   bigRef.close();
   previewServer.close();
+  mfeRef.close();
+  mfeDev.close();
   refServer.close();
 }
 process.exit(failed ? 1 : 0);
