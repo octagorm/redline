@@ -91,10 +91,15 @@ globalThis.Redline ??= (() => {
   // The text blocks of a document, innermost only: a block holding another
   // block is skipped (its loose text with it), as nested lists would otherwise
   // count twice.
+  //
+  // `opt.scope` keeps only the blocks inside it, as for a micro-frontend
+  // mounted in a host page; a page without that element is read whole.
   function blocks(doc, opt = {}) {
     const sel = opt.blocks || DEFAULT_BLOCKS;
+    const scope = opt.scope && doc.querySelector(opt.scope) ? opt.scope : "";
     const out = [];
     for (const el of doc.querySelectorAll(sel)) {
+      if (scope && !el.closest(scope)) continue;
       if (el.closest(OWN)) continue;
       if (opt.ignore && el.closest(opt.ignore)) continue;
       if (el.closest("[hidden],template")) continue;
@@ -146,10 +151,11 @@ globalThis.Redline ??= (() => {
   }
 
   // Share of words two blocks have in common (Dice), to tell a rewritten
-  // paragraph from one removed next to one added.
+  // paragraph from one removed next to one added. Case is ignored, so
+  // "Dato mottatt" and "Mottatt dato" are a rewrite of each other.
   function similarity(a, b) {
-    const x = new Set(a.split(" "));
-    const y = new Set(b.split(" "));
+    const x = new Set(a.toLowerCase().split(" "));
+    const y = new Set(b.toLowerCase().split(" "));
     let both = 0;
     for (const word of x) if (y.has(word)) both++;
     return (2 * both) / (x.size + y.size || 1);
@@ -305,6 +311,11 @@ globalThis.Redline ??= (() => {
       for (let k = i; k < own.length; k++) if (at(k)) return at(k);
       return undefined;
     };
+    // The nearest block on the page before own[i].
+    const anchorBefore = (i) => {
+      for (let k = Math.min(i, own.length) - 1; k >= 0; k--) if (at(k)) return at(k);
+      return undefined;
+    };
     // Every change, with an id made from its text: a review of it holds for
     // as long as the change stays the same.
     const changes = [];
@@ -318,16 +329,32 @@ globalThis.Redline ??= (() => {
       const next = anchorFrom(before);
       const like = next ?? dom[dom.length - 1];
       if (!like) return;
-      const el = oldBlock(
-        like.el,
-        text.split(" ").map((w) => ({ text: w, gone: true })),
-        true,
-        refs[o]
-      );
+      const words = text.split(" ").map((w) => ({ text: w, gone: true }));
+      // A cell of a table, description list or grid: an extra cell beside it
+      // would push every later cell one place on. It goes inside a cell
+      // instead, at the end of the one before (so it stays in its own row) or
+      // else at the start of the one after, once their own marks are known.
+      const prev = anchorBefore(before);
+      const cell =
+        prev && inCell(prev.el) && (!next || inCell(next.el)) ? { el: prev.el, first: false }
+        : next && inCell(next.el) ? { el: next.el, first: true }
+        : null;
+      if (cell) {
+        const el = document.createElement("div");
+        el.className = "redline-old redline-removed redline-in-cell";
+        const del = document.createElement("del");
+        del.textContent = text;
+        el.append(del);
+        note("removed", text, "", el);
+        inCells.push({ el, cell: cell.el, first: cell.first });
+        return;
+      }
+      const el = oldBlock(like.el, words, true, refs[o]);
       if (next) next.el.before(el);
       else like.el.after(el);
       note("removed", text, "", el);
     };
+    const inCells = [];
 
     const kept = lcs(own, old, (a, b) => a === b);
     kept.push([own.length, old.length]);
@@ -389,7 +416,33 @@ globalThis.Redline ??= (() => {
       i = ki + 1;
       j = kj + 1;
     }
+    // A changed cell is swapped for its old wording in the "removed" view, so
+    // a removed block in it goes in both. Several in one cell keep their order.
+    const lastIn = new Map();
+    for (const { el, cell, first } of inCells) {
+      const old = cell.hasAttribute("data-redline-changed") ? cell.nextElementSibling : null;
+      const into = [cell];
+      if (old?.matches(".redline-old:not(.redline-removed)")) into.push(old);
+      for (const [k, c] of into.entries()) {
+        const copy = k ? el.cloneNode(true) : el;
+        if (!first) c.append(copy);
+        else if (lastIn.has(c)) lastIn.get(c).after(copy);
+        else c.prepend(copy);
+        lastIn.set(c, copy);
+      }
+    }
     return changes;
+  }
+
+  // Table cells, description list items and items of a CSS grid take a place
+  // in a layout that a block inserted beside them would shift.
+  const CELLS = new Set(["DT", "DD", "TD", "TH"]);
+  function inCell(el) {
+    if (CELLS.has(el.tagName)) return true;
+    const parent = el.parentElement;
+    if (!parent) return false;
+    const display = getComputedStyle(parent).display;
+    return display === "grid" || display === "inline-grid";
   }
 
   // A short id for a change, from its kind and text (FNV-1a).
@@ -485,6 +538,13 @@ html.redline-all .redline-old.redline-removed {
 html.redline-all .redline-old.redline-removed del { background: none !important; }
 html.redline-removed-only [data-redline-changed],
 html.redline-removed-only [data-redline-new] { display: none !important; }
+/* A new cell keeps its place in the "removed" view when it holds removed text,
+   showing only that. */
+html.redline-removed-only [data-redline-new]:has(> .redline-in-cell) {
+  display: revert !important;
+  visibility: hidden !important;
+}
+html.redline-removed-only [data-redline-new] > .redline-in-cell { visibility: visible !important; }
 /* Reviewed: approved changes turn green and quiet, rejected ones get a red ring. */
 html.redline-on [data-redline-review="ok"] {
   box-shadow: -10px 0 0 rgba(80, 170, 110, 0.12), -13px 0 0 #3c9a5f !important;
