@@ -57,14 +57,17 @@ one. The list stays for the tab until you scan again.
 
 ## Install
 
-Not in the Chrome Web Store yet. To load it from this folder:
+Install it from the
+[Chrome Web Store](https://chromewebstore.google.com/detail/redline/dmklhbagmdnahnflpmmeagcopljbciij)
+and pin Redline to the toolbar. It should work the same in other Chromium
+browsers (Brave, Arc, Edge).
+
+To run it from a clone instead, for example to try a change:
 
 1. Clone the repo.
 2. Open `chrome://extensions`, turn on **Developer mode**, click **Load
    unpacked** and pick the folder.
 3. Pin Redline to the toolbar.
-
-It should work the same in other Chromium browsers (Brave, Arc, Edge).
 
 ## Use
 
@@ -100,6 +103,10 @@ page in a background tab next to yours (with your sign-in, like any tab),
 waits until its scripts have drawn it, reads it, closes the tab, and compares
 it with the live page.
 
+As the reference's scripts run, signed in as you, whatever the page does when
+you open it happens then too: if opening a page marks a task as read or takes
+it, so does Redline. That also goes for every page the pages list checks.
+
 Online, a micro-frontend usually sits inside a host page with its own header
 and menus, while locally it runs on its own. Set **Compare within** to the
 element the app is mounted in, such as `#my-app`, so the host's text does not
@@ -120,12 +127,18 @@ the settings. Put this in the `<head>` of every page:
 
 ```html
 <meta name="redline" content="https://example.com">
-<!-- optional: text that differs but is not content -->
-<meta name="redline-ignore" content="nav, footer, sup">
-<!-- optional, for apps drawn in the browser: render, and compare only #app -->
-<meta name="redline-render" content="true">
-<meta name="redline-scope" content="#app">
 ```
+
+Settings for the pair can follow the address, separated by semicolons:
+
+```html
+<meta name="redline" content="https://example.com; ignore=nav, footer, sup">
+```
+
+- `ignore=`: text that differs but is not content, as in the settings.
+- `scope=`: compare only within this element, such as `#app`.
+- `render`: for apps drawn in the browser; see below.
+- `root=`: the folder the site is served from, for previews in a folder.
 
 Clicking the Redline button on a page with the tag saves the pair and starts
 comparing. Chrome asks once for access to both sites. If Chrome will not ask
@@ -154,13 +167,12 @@ itself and says nothing changed. Or render it only on previews, for example:
   so it compares `…/pr-preview/pr-5/about` with `…/about`:
 
   ```html
-  <meta name="redline" content="https://<user>.github.io/<repo>">
-  <meta name="redline-root" content="/<repo>/pr-preview/pr-5/">
+  <meta name="redline" content="https://<user>.github.io/<repo>; root=/<repo>/pr-preview/pr-5/">
   ```
 
   In the workflow, pass the folder to the build, for example as
   `REDLINE_ROOT: /${{ github.event.repository.name }}/pr-preview/pr-${{ github.event.number }}/`,
-  and render the two tags only when it is set.
+  and render the tag only when it is set.
 
 Vercel, Cloudflare and Netlify post their preview links on the pull request
 themselves, so with the tag in place, a reviewer can open the link from the PR
