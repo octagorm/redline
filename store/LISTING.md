@@ -32,7 +32,7 @@ It stays on in the tab as you click around, including in single-page apps.
 
 Sites can set it up for their visitors: a preview build with <meta name="redline" content="https://your-production-site"> needs no settings at all, just a click on the button. That works for Vercel, Netlify and Cloudflare previews, and for GitHub Pages PR previews served from a folder.
 
-Redline compares the text both servers send, so a clock or a "3 minutes ago" drawn in the browser never shows up as a change. Sites behind a login work as long as you are signed in to them. Each pair can ignore parts of the page (menus, footers, footnote numbers) with a CSS selector.
+Redline compares the text both servers send, so a clock or a "3 minutes ago" drawn in the browser never shows up as a change. Sites behind a login work as long as you are signed in to them. Each pair can ignore parts of the page (menus, footers, footnote numbers) with a CSS selector. Apps drawn entirely in the browser, such as micro-frontends, can be rendered before they are compared, and compared only within the app's own part of the page.
 
 Redline has no servers, analytics or accounts. It only talks to the sites you pair, and only asks for access to those. Open source: https://github.com/octagorm/redline
 
@@ -43,12 +43,13 @@ Redline has no servers, analytics or accounts. It only talks to the sites you pa
 **Graphic assets:**
 - Store icon: `../icons/128.png`
 - Screenshots (1280×800), in this order: `screenshot-1-all.png`,
-  `screenshot-2-review.png`, `screenshot-3-pages.png`, `screenshot-4-removed.png`
+  `screenshot-2-review.png`, `screenshot-3-pages.png`, `screenshot-4-removed.png`,
+  `screenshot-5-settings.png`
 - Small promo tile (440×280): `promo-440x280.png`
 
 To remake the screenshots: `STORE=1 npm test` (writes `all.png`, `review.png`,
-`pages.png` and `removed.png` here; rename them), and open `tile.html` at
-440×280 for the tile.
+`pages.png`, `removed.png` and `settings.png` here; rename them, and delete
+`added.png`), and open `tile.html` at 440×280 for the tile.
 
 **Homepage URL:** https://github.com/octagorm/redline
 
@@ -62,7 +63,7 @@ Compare the page in the current tab with the same page on another site the user 
 **Permission justifications:**
 
 - `storage`: Saves the user's pairs of sites to compare, their ignore rules, and their reviews of changes (approved, rejected, notes), in the browser only.
-- `scripting`: Runs the comparison script on the sites the user has added, in a tab that was open before a site was added, and reads a page's <meta name="redline"> tag when the user clicks the toolbar button.
+- `scripting`: Runs the comparison script on the sites the user has added, in a tab that was open before a site was added, and reads a page's <meta name="redline"> tag when the user clicks the toolbar button. For pairs set to render, it reads the reference page in a background tab Redline opens and closes again.
 - `activeTab`: Lets the toolbar button turn the comparison on in the current tab.
 - Host permissions (optional, requested per site): Redline needs to read the pages of the site the user is working on and fetch the same pages from the site they compare it with. It asks for access to exactly the two sites of a pair, when the user saves the pair or accepts the pair a page suggests.
 
