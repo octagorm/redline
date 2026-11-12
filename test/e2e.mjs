@@ -85,7 +85,7 @@ function serve(pages, port, needCookie) {
 const preview = {
   "/pr-preview/pr-5/": dev["/"].replace(
     "<head>",
-    `<head><meta name="redline" content="http://127.0.0.1:47312"><meta name="redline-root" content="/pr-preview/pr-5/"><meta name="redline-ignore" content="nav, footer, sup">`
+    `<head><meta name="redline" content="http://127.0.0.1:47312; root=/pr-preview/pr-5/; ignore=nav, footer, sup">`
   ),
 };
 const previewServer = await serve(preview, 47313, false);
@@ -514,6 +514,28 @@ try {
   assert.deepEqual(
     await tab.$$eval("mark.redline-new", (m) => m.map((x) => x.textContent)),
     ["whole", "redrawn"]
+  );
+  // The settings follow the address in the same tag, separated by semicolons.
+  // (Settings left out come back missing: Chrome drops undefined fields.)
+  const readTag = async (content) => {
+    await tab.evaluate((content) => {
+      document.querySelector('meta[name="redline"]').setAttribute("content", content);
+    }, content);
+    return sw.evaluate(async () => {
+      const [t] = await chrome.tabs.query({ url: "http://localhost:47313/*" });
+      const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: t.id }, func: RedlinePairs.readMeta });
+      return result;
+    });
+  };
+  assert.deepEqual(
+    await readTag("https://example.com; render; Scope=#app ;ignore=nav, footer;"),
+    { to: "https://example.com", ignore: "nav, footer", render: "", scope: "#app" }
+  );
+  assert.deepEqual(await readTag("https://example.com"), { to: "https://example.com" });
+  assert.equal(
+    (await sw.evaluate(() => RedlinePairs.hintFrom({ to: "https://example.com", render: "" }, "http://localhost:47313/"))).render,
+    true,
+    "a bare render turns it on"
   );
   // No sitemap here: it follows links, but stays inside the preview's folder.
   await tab.evaluate(() =>

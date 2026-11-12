@@ -60,11 +60,10 @@ globalThis.RedlinePairs ??= (() => {
 
   // A site can say what to compare it with, so nobody has to set it up:
   //   <meta name="redline" content="https://example.com">
-  //   <meta name="redline-root" content="/pr-preview/pr-5/">   (optional)
-  //   <meta name="redline-ignore" content="nav, footer, sup">  (optional)
-  //   <meta name="redline-render" content="true">          (optional)
-  //   <meta name="redline-scope" content="#app">           (optional)
-  // `meta` holds those contents, as readMeta() returns them. The tag
+  // with optional settings after the address, separated by semicolons:
+  //   <meta name="redline" content="https://example.com; ignore=nav, footer, sup;
+  //     root=/pr-preview/pr-5/; scope=#app; render">
+  // `meta` holds those settings, as readMeta() returns them. The tag
   // wins over a saved pair, so a second project served on the same
   // localhost port compares with its own reference, not the last one's.
   function hintFrom(meta, href) {
@@ -93,12 +92,21 @@ globalThis.RedlinePairs ??= (() => {
   function readMeta() {
     const meta = (n) =>
       document.querySelector(`meta[name="${n}"]`)?.getAttribute("content")?.trim();
+    // "https://example.com; render; scope=#app": the address, then settings.
+    const [to, ...parts] = (meta("redline") ?? "").split(";").map((s) => s.trim());
+    const settings = {};
+    for (const part of parts) {
+      if (!part) continue;
+      const eq = part.indexOf("=");
+      const key = (eq < 0 ? part : part.slice(0, eq)).trim().toLowerCase();
+      settings[key] = eq < 0 ? "" : part.slice(eq + 1).trim();
+    }
     return {
-      to: meta("redline"),
-      root: meta("redline-root"),
-      ignore: meta("redline-ignore"),
-      render: meta("redline-render"),
-      scope: meta("redline-scope"),
+      to: to || undefined,
+      root: settings.root,
+      ignore: settings.ignore,
+      render: settings.render,
+      scope: settings.scope,
     };
   }
 
