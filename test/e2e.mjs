@@ -305,11 +305,28 @@ try {
   await tab.hover("p[data-redline-new]");
   await tab.keyboard.press("c");
   await tab.waitForTimeout(100);
+  // Passing over another change leaves the open note where it is.
+  const noteFor = () =>
+    tab.evaluate(() => {
+      const r = document.querySelector("#redline-tools")?.shadowRoot;
+      return r && !r.querySelector("form").hidden;
+    });
+  await tab.mouse.move(5, 5);
+  await tab.hover("p[data-redline-changed]");
+  await tab.waitForTimeout(150);
+  assert.equal(await noteFor(), true, "the note stays open on hover");
+  await tab.evaluate(() => document.querySelector("#redline-tools").shadowRoot.querySelector("[name=note]").focus());
   await tab.keyboard.type("Too vague; name a maker.");
   await tab.evaluate(`${toolsRoot}.querySelector(".suggest").click()`);
   await tab.evaluate(`(() => { const t = ${toolsRoot}.querySelector("[name=suggestion]"); t.value = "A new paragraph about Jost Bürgi's astrolabes."; })()`);
   await tab.evaluate(`${toolsRoot}.querySelector("form").requestSubmit()`);
   await tab.waitForFunction(`document.querySelector("p[data-redline-new]").hasAttribute("data-redline-noted")`);
+  // Esc closes a note, also with the focus outside it.
+  await tab.keyboard.press("c");
+  await tab.waitForTimeout(100);
+  await tab.mouse.click(5, 5);
+  await tab.keyboard.press("Escape");
+  assert.equal(await noteFor(), false, "Esc closes the note");
   console.log("reviewed:", await badge());
   assert.match(await badge(), /1 to review/);
   assert.match(await badge(), /1 ✓ 1 ✗ 1 ✎/);

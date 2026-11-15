@@ -519,7 +519,10 @@ P       pages: which pages differ"><span>J↓</span><span>K↑</span><span>V</sp
       review(tools.change, { note, suggestion });
     };
     $("form").onkeydown = (e) => {
-      if (e.key === "Escape") $("form").hidden = true;
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        closeNote();
+      }
       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) $("form").requestSubmit();
     };
     document.documentElement.append(tools.host);
@@ -535,6 +538,17 @@ P       pages: which pages differ"><span>J↓</span><span>K↑</span><span>V</sp
   function toggleState(s) {
     const e = reviews?.entries[tools.change?.id];
     review(tools.change, { state: e?.state === s ? null : s });
+  }
+
+  function noteOpen() {
+    const form = tools.host?.isConnected && tools.root?.querySelector("form");
+    return !!form && !form.hidden;
+  }
+
+  function closeNote() {
+    if (!noteOpen()) return;
+    tools.root.querySelector("form").hidden = true;
+    placeTools();
   }
 
   function openNote() {
@@ -609,6 +623,9 @@ P       pages: which pages differ"><span>J↓</span><span>K↑</span><span>V</sp
     "mouseover",
     (e) => {
       if (!state.on || !state.count) return;
+      // An open note stays with its change until it is saved, cancelled or
+      // closed with Esc: passing over another paragraph must not lose it.
+      if (noteOpen()) return;
       const change = changeOf(e.target);
       if (change && change.id !== tools.change?.id) showTools(change);
     },
@@ -897,6 +914,12 @@ P       pages: which pages differ"><span>J↓</span><span>K↑</span><span>V</sp
       if (t?.closest?.("input, textarea, select, [contenteditable]") || t?.isContentEditable)
         return;
       const key = e.key.toLowerCase();
+      // Esc closes an open note even when the focus has left it.
+      if (key === "escape" && noteOpen()) {
+        closeNote();
+        e.preventDefault();
+        return;
+      }
       if (key === "p") togglePages();
       else if (!state.count) return;
       else if (key === "v")
