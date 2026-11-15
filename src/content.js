@@ -335,8 +335,17 @@ P       pages: which pages differ"><span>J↓</span><span>K↑</span><span>V</sp
     const dom = R.blocks(document, opt);
     state.changes = R.show(dom, old, own);
     state.count = state.changes.length;
+    // Paragraphs the changes did not touch can carry notes as well.
+    state.same = [];
+    for (const b of dom) {
+      if (b.el.hasAttribute("data-redline-id")) continue;
+      const id = R.changeId("same", b.text, b.text);
+      b.el.setAttribute("data-redline-id", id);
+      b.el.setAttribute("data-redline-same", "");
+      state.same.push({ id, kind: "same", before: b.text, after: b.text });
+    }
     try {
-      reviews = await RV().setPage(pair, rest(), state.changes);
+      reviews = await RV().setPage(pair, rest(), state.changes, state.same);
     } catch {
       reviews = null;
     }
@@ -372,7 +381,7 @@ P       pages: which pages differ"><span>J↓</span><span>K↑</span><span>V</sp
   const rest = () => globalThis.RedlinePairs.restFor(pair, location.href);
   const changeOf = (el) => {
     const id = el?.closest?.("[data-redline-id]")?.getAttribute("data-redline-id");
-    return id ? state.changes.find((c) => c.id === id) : null;
+    return id ? state.changes.find((c) => c.id === id) ?? state.same?.find((c) => c.id === id) : null;
   };
 
   // Shows each change's review on the page.
@@ -397,7 +406,7 @@ P       pages: which pages differ"><span>J↓</span><span>K↑</span><span>V</sp
 
   // Goes to the next change with no reaction yet, after the current one.
   function nextOpen() {
-    const open = [...document.querySelectorAll("[data-redline-id]")].filter(
+    const open = [...document.querySelectorAll("[data-redline-id]:not([data-redline-same])")].filter(
       (el) => el.getClientRects().length && !RV().reacted(reviews, el.getAttribute("data-redline-id"))
     );
     if (!open.length) return;
@@ -449,6 +458,8 @@ P       pages: which pages differ"><span>J↓</span><span>K↑</span><span>V</sp
   .t button { border:0; background:none; color:#f3efe6; width:26px; height:24px;
               border-radius:5px; cursor:pointer; font:inherit; }
   .t button:hover { background:#3a362f; }
+  .t.quiet { opacity:.75; }
+  .t.quiet:hover { opacity:1; }
   .t button[data-tip] { position:relative; }
   .t button[data-tip]:hover::after { content:attr(data-tip); position:absolute; right:0;
     top:calc(100% + 6px); width:max-content; white-space:pre; padding:4px 7px;
@@ -536,6 +547,7 @@ P       pages: which pages differ"><span>J↓</span><span>K↑</span><span>V</sp
   }
 
   function toggleState(s) {
+    if (tools.change?.kind === "same") return;
     const e = reviews?.entries[tools.change?.id];
     review(tools.change, { state: e?.state === s ? null : s });
   }
@@ -585,6 +597,11 @@ P       pages: which pages differ"><span>J↓</span><span>K↑</span><span>V</sp
     tools.change = change;
     tools.el = el;
     tools.host.hidden = false;
+    // Nothing to approve or reject in a paragraph that did not change.
+    const same = change.kind === "same";
+    root.querySelector(".ok").hidden = same;
+    root.querySelector(".no").hidden = same;
+    root.querySelector(".t").classList.toggle("quiet", same);
     const e = reviews?.entries[change.id];
     root.querySelector(".ok").setAttribute("aria-pressed", String(e?.state === "ok"));
     root.querySelector(".no").setAttribute("aria-pressed", String(e?.state === "no"));
@@ -622,7 +639,7 @@ P       pages: which pages differ"><span>J↓</span><span>K↑</span><span>V</sp
   addEventListener(
     "mouseover",
     (e) => {
-      if (!state.on || !state.count) return;
+      if (!state.on || state.count === null) return;
       // An open note stays with its change until it is saved, cancelled or
       // closed with Esc: passing over another paragraph must not lose it.
       if (noteOpen()) return;
@@ -921,17 +938,18 @@ P       pages: which pages differ"><span>J↓</span><span>K↑</span><span>V</sp
         return;
       }
       if (key === "p") togglePages();
+      else if (key === "c" && tools.change) openNote();
       else if (!state.count) return;
       else if (key === "v")
         setMode(MODES[(MODES.indexOf(state.mode) + 1) % MODES.length]);
-      else if ((key === "a" || key === "x") && tools.change) {
+      else if ((key === "a" || key === "x") && tools.change && tools.change.kind !== "same") {
         // Approve or reject, then on to the next change.
         const s = key === "a" ? "ok" : "no";
         const was = reviews?.entries[tools.change.id]?.state;
         review(tools.change, { state: was === s ? null : s }).then(() => {
           if (was !== s) nextOpen();
         });
-      } else if (key === "c" && tools.change) openNote();
+      }
       else if (key === "j") step(1);
       else if (key === "k") step(-1);
       else return;

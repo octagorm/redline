@@ -23,9 +23,10 @@ globalThis.RedlineReview ??= (() => {
   }
 
   // Records the changes a page has now. Returns the stored data.
-  async function setPage(pair, path, changes) {
+  // `same` are the page's unchanged paragraphs, which can carry notes too.
+  async function setPage(pair, path, changes, same = []) {
     const data = await load(pair);
-    data.pages[path] = { ids: changes.map((c) => c.id), at: Date.now() };
+    data.pages[path] = { ids: changes.map((c) => c.id), same: same.map((c) => c.id), at: Date.now() };
     await save(pair, data);
     return data;
   }
@@ -66,7 +67,7 @@ globalThis.RedlineReview ??= (() => {
   function feedback(data) {
     const out = [];
     for (const [path, page] of Object.entries(data.pages))
-      for (const id of page.ids) {
+      for (const id of [...page.ids, ...(page.same ?? [])]) {
         const e = data.entries[id];
         if (e && (e.state === "no" || e.note || e.suggestion)) out.push({ id, ...e, path });
       }
@@ -122,6 +123,7 @@ globalThis.RedlineReview ??= (() => {
         new: "A paragraph the new version added",
         changed: "A paragraph the new version rewrote",
         removed: "A paragraph the new version removed",
+        same: "A paragraph the changes did not touch",
       }[e.kind];
       const verdict =
         e.state === "no"
@@ -131,6 +133,7 @@ globalThis.RedlineReview ??= (() => {
             : "commented";
       lines.push("", `### ${what}. Reviewer ${verdict}`, "");
       if (e.kind === "new") lines.push(`- The paragraph now reads: ${q(e.after)}`);
+      if (e.kind === "same") lines.push(`- The paragraph reads: ${q(e.after)}`);
       if (e.kind === "removed") lines.push(`- The paragraph read: ${q(e.before)}`);
       if (e.kind === "changed") {
         const d = wordDiff(e.before, e.after);

@@ -26,6 +26,10 @@ Approved changes turn green, rejected ones get a red ring, and the badge
 counts them, with **N to review** for the changes nobody has reacted to yet;
 click it to go to the next one.
 
+Paragraphs the changes did not touch can take notes too: point at one and a
+smaller toolbar with only **✎** appears (or press <kbd>C</kbd>). These notes
+do not count towards "to review".
+
 **copy notes** puts every rejection, note and suggested wording on the
 clipboard as a Markdown list, page by page, quoting the text and what it was
 before: ready to paste to Claude, or into a pull request review.

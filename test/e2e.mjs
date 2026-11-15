@@ -332,6 +332,29 @@ try {
   assert.match(await badge(), /1 ✓ 1 ✗ 1 ✎/);
   assert.match(await badge(), /copy notes \(1\)/);
   await tab.screenshot({ path: path.join(out, "review.png") });
+
+  // A paragraph the changes did not touch takes a note too, with no ✓ or ✗.
+  await tab.mouse.move(5, 5);
+  await tab.hover("text=Unchanged text stays as it is");
+  await tab.waitForFunction(() => {
+    const r = document.querySelector("#redline-tools")?.shadowRoot;
+    return r && r.querySelector(".ok").hidden && r.querySelector(".t").classList.contains("quiet");
+  });
+  await tab.keyboard.press("x"); // nothing to reject here
+  await tab.keyboard.press("c");
+  await tab.waitForTimeout(100);
+  await tab.keyboard.type("Say what it stays as.");
+  await tab.keyboard.press("Meta+Enter");
+  await tab.keyboard.press("Control+Enter");
+  await tab.waitForFunction(() =>
+    [...document.querySelectorAll("p")].some((p) => p.textContent.startsWith("Unchanged") && p.hasAttribute("data-redline-noted"))
+  );
+  assert.equal(
+    await tab.evaluate(() => [...document.querySelectorAll("p")].find((p) => p.textContent.startsWith("Unchanged")).getAttribute("data-redline-review")),
+    null
+  );
+  assert.match(await badge(), /copy notes \(2\)/);
+  assert.match(await badge(), /1 to review/, "notes on untouched text do not change what is left to review");
   const notes = await sw.evaluate(async () => {
     const all = await chrome.storage.local.get(null);
     return Object.keys(all).filter((k) => k.startsWith("review:"));
@@ -349,6 +372,7 @@ try {
   assert.deepEqual(JSON.parse(markdown).sort(), [
     ["no", "new", "Too vague; name a maker.", "A new paragraph about Jost Bürgi's astrolabes."],
     ["ok", "changed", "", ""],
+    [null, "same", "Say what it stays as.", ""],
   ].sort());
   await tab.reload();
   await waitBadge(/change/);

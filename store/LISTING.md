@@ -25,6 +25,7 @@ Pair the site you are working on (say http://localhost:3000) with the site to co
 • Press V to switch views: all changes, only what was added, or only what was removed.
 • Press J and K to jump to the next and previous change.
 • Review as you go: approve (A) or reject (X) each change, or add a note or suggested wording (C). The badge shows how many changes are still to review.
+• Notes and suggested wording work on any paragraph, not only the changed ones.
 • "Copy notes" puts all your rejections, notes and suggested wording on the clipboard as one clear list, ready to paste to a colleague or an AI assistant.
 • "Pages" (P) lists every page of the site that differs, including new and removed pages, with each page's review progress. It checks pages on request, a batch at a time, so it is gentle on big sites.
 

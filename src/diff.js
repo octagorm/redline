@@ -493,6 +493,7 @@ globalThis.Redline ??= (() => {
         e.removeAttribute("data-redline-new");
         e.removeAttribute("data-redline-changed");
         e.removeAttribute("data-redline-id");
+        e.removeAttribute("data-redline-same");
         e.removeAttribute("data-redline-review");
       });
   }
@@ -579,5 +580,5 @@ html.redline-added .redline-old.redline-removed {
   box-shadow: none !important;
 }`;
 
-  return { DEFAULT_BLOCKS, tokens, blocks, lcs, similarity, show, count, clear, CSS };
+  return { DEFAULT_BLOCKS, tokens, blocks, lcs, similarity, show, count, clear, changeId, CSS };
 })();
