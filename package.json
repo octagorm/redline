@@ -1,6 +1,6 @@
 {
   "name": "redline",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "private": true,
   "description": "Browser extension: word-level diff of the page you are on against the same page on another site.",
   "license": "MIT",
